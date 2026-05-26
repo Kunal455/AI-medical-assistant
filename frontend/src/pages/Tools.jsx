@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
+import { API_BASE_URL } from "../config";
 
 function Tools() {
     const [activeTab, setActiveTab] = useState("report");
@@ -27,7 +28,7 @@ function Tools() {
         formData.append("file", file);
 
         try {
-            const res = await fetch(`API_BASE_URL/api/v1/analyze/${endpoint}`, {
+            const res = await fetch(`${API_BASE_URL}/api/v1/analyze/${endpoint}`, {
                 method: "POST",
                 body: formData
             });
@@ -51,7 +52,7 @@ function Tools() {
         setResponse(null);
 
         try {
-            const res = await fetch(`http://localhost:5000/api/v1/analyze/${endpoint}`, {
+            const res = await fetch(`${API_BASE_URL}/api/v1/analyze/${endpoint}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ [key]: textInput })

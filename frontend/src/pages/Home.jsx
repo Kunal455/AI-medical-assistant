@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { API_BASE_URL } from "../config";
 
 function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -7,7 +8,7 @@ function Home() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const res = await fetch("API_BASE_URL/api/v1/user/profile", {
+        const res = await fetch(`${API_BASE_URL}/api/v1/user/profile`, {
           credentials: "include"
         });
         if (res.ok) {

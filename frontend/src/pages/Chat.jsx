@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
+import { API_BASE_URL } from "../config";
 
 function Chat() {
   const [message, setMessage] = useState("");
@@ -16,7 +17,7 @@ function Chat() {
 
   const fetchHistory = async () => {
     try {
-      const res = await fetch("API_BASE_URL/api/v1/chat", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/chat`, {
         credentials: "include"
       });
       if (res.status === 401) {
@@ -34,7 +35,7 @@ function Chat() {
 
   const loadChat = async (id) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/v1/chat/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/chat/${id}`, {
         credentials: "include"
       });
       if (res.status === 401) {
@@ -58,7 +59,7 @@ function Chat() {
 
   const handleLogout = async () => {
     try {
-      await fetch("http://localhost:5000/api/v1/user/logout", {
+      await fetch(`${API_BASE_URL}/api/v1/user/logout`, {
         credentials: "include"
       });
       navigate("/login");
@@ -75,7 +76,7 @@ function Chat() {
     setMessage("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/v1/chat", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -115,7 +116,7 @@ function Chat() {
     formData.append("file", file);
 
     try {
-      const res = await fetch("http://localhost:5000/api/v1/medical/upload-report", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/medical/upload-report`, {
         method: "POST",
         credentials: "include",
         body: formData
