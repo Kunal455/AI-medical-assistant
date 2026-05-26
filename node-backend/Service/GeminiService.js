@@ -1,11 +1,14 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 class GeminiService {
-    static getModel(systemInstruction = null) {
+    static getModel(systemInstruction = null, enableSearch = false) {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "YOUR_API_KEY");
         const config = { model: "gemini-2.5-flash" };
         if (systemInstruction) {
             config.systemInstruction = systemInstruction;
+        }
+        if (enableSearch) {
+            config.tools = [{ googleSearch: {} }];
         }
         return genAI.getGenerativeModel(config);
     }
@@ -52,7 +55,7 @@ CRITICAL RULES:
 4. Always remind the user to consult a doctor for serious concerns.
 5. Keep your answers concise, empathetic, and informative.`;
 
-            const model = this.getModel(systemPrompt);
+            const model = this.getModel(systemPrompt, true);
             
             // Format history for Gemini SDK
             const history = [];
