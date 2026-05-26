@@ -1,45 +1,44 @@
-const axios = require("axios");
-const FormData = require("form-data");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fs = require("fs");
 
 class OcrService {
     static async extractText(filePath, mimeType) {
         try {
-            // If it's a PDF, we might use a specific parameter, but OCR.Space handles both
-            const formData = new FormData();
-            formData.append("file", fs.createReadStream(filePath));
-            formData.append("apikey", process.env.OCR_SPACE_API_KEY || "helloworld"); 
-            formData.append("language", "eng");
-            formData.append("isOverlayRequired", "false");
-            
-            // Explicitly specify PDF file type if applicable
-            if (mimeType === "application/pdf") {
-                formData.append("filetype", "PDF");
-            }
+            // Initialize Gemini with API Key
+            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "YOUR_API_KEY");
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-            const response = await axios.post("https://api.ocr.space/parse/image", formData, {
-                headers: {
-                    ...formData.getHeaders()
+            // Read local file and convert to Base64
+            if (!fs.existsSync(filePath)) {
+                throw new Error("File not found at path: " + filePath);
+            }
+            const fileBuffer = fs.readFileSync(filePath);
+            const base64Data = fileBuffer.toString("base64");
+
+            const filePart = {
+                inlineData: {
+                    data: base64Data,
+                    mimeType: mimeType
                 }
-            });
+            };
 
-            const data = response.data;
-            if (data.IsErroredOnProcessing) {
-                throw new Error(data.ErrorMessage[0] || "OCR processing failed");
+            const prompt = `You are a professional medical document scanner. 
+Your task is to transcribe all readable text from the provided medical document (image or PDF) with absolute accuracy. 
+Preserve the structure, labels, values, prescriptions, and notes. Do not summarize, explain, or add any commentary. 
+If the text contains handwriting, try your best to decipher it (especially drug names and dosages). 
+Return ONLY the raw transcribed text.`;
+
+            const result = await model.generateContent([filePart, prompt]);
+            const responseText = result.response.text();
+
+            if (!responseText) {
+                throw new Error("Gemini returned empty transcription");
             }
 
-            // Combine parsed text from all pages
-            let extractedText = "";
-            if (data.ParsedResults && data.ParsedResults.length > 0) {
-                data.ParsedResults.forEach(page => {
-                    extractedText += page.ParsedText + "\n";
-                });
-            }
-
-            return extractedText.trim();
+            return responseText.trim();
         } catch (error) {
-            console.error("OCR Service Error:", error.response?.data || error.message);
-            throw new Error("Failed to extract text from file");
+            console.error("Gemini OCR Service Error:", error);
+            throw new Error("Failed to extract text from document: " + error.message);
         }
     }
 }

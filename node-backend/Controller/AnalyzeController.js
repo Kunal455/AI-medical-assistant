@@ -1,19 +1,5 @@
 const fs = require("fs");
-const pdfParse = require("pdf-parse");
-const Tesseract = require("tesseract.js");
-
-// Extract text from PDF
-async function extractPdfText(path) {
-    const dataBuffer = fs.readFileSync(path);
-    const data = await pdfParse(dataBuffer);
-    return data.text;
-}
-
-// Extract text from Image
-async function extractImageText(path) {
-    const result = await Tesseract.recognize(path, "eng");
-    return result.data.text;
-}
+const OcrService = require("../Service/OcrService");
 
 // Generic file handler proxy to Python backend
 const analyzeFile = (pythonEndpoint) => async (req, res) => {
@@ -23,18 +9,13 @@ const analyzeFile = (pythonEndpoint) => async (req, res) => {
             return res.status(400).json({ error: "No file uploaded" });
         }
 
-        let extractedText = "";
-
-        if (file.mimetype === "application/pdf") {
-            extractedText = await extractPdfText(file.path);
-        } else if (file.mimetype.startsWith("image/")) {
-            extractedText = await extractImageText(file.path);
-        } else {
-            return res.status(400).json({ error: "Unsupported file format. Please upload PDF or Image." });
-        }
+        // Use high-fidelity Gemini OCR
+        const extractedText = await OcrService.extractText(file.path, file.mimetype);
 
         // Clean up the uploaded file to save space
-        fs.unlinkSync(file.path);
+        if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+        }
 
         // Determine key for python backend (reportText vs prescriptionText)
         const key = pythonEndpoint.includes("report") ? "reportText" : "prescriptionText";
