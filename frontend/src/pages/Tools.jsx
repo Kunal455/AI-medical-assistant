@@ -27,7 +27,7 @@ function Tools() {
         formData.append("file", file);
 
         try {
-            const res = await fetch(`http://localhost:5000/api/v1/analyze/${endpoint}`, {
+            const res = await fetch(`API_BASE_URL/api/v1/analyze/${endpoint}`, {
                 method: "POST",
                 body: formData
             });

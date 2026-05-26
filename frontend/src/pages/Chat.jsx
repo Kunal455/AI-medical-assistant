@@ -16,7 +16,7 @@ function Chat() {
 
   const fetchHistory = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/v1/chat", {
+      const res = await fetch("API_BASE_URL/api/v1/chat", {
         credentials: "include"
       });
       if (res.status === 401) {

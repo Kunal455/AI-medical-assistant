@@ -12,7 +12,7 @@ function Register() {
     e.preventDefault();
     setError(null);
     try {
-      const response = await fetch("http://localhost:5000/api/v1/user/signup", {
+      const response = await fetch("API_BASE_URL/api/v1/user/signup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
