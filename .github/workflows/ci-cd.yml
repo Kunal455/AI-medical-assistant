@@ -39,7 +39,7 @@ jobs:
           JWT_SECRET: test_secret_key
         run: npm test
 
-  # Job 2: Test Python Backend
+  
   python-backend-ci:
     name: Python Backend Test Suite
     runs-on: ubuntu-latest
@@ -66,7 +66,7 @@ jobs:
           GEMINI_API_KEY: fake_api_key_for_testing
         run: pytest
 
-  # Job 3: Build & Verify Frontend
+ 
   frontend-ci:
     name: Frontend Build & Test Suite
     runs-on: ubuntu-latest
@@ -93,7 +93,7 @@ jobs:
       - name: Build Frontend
         run: npm run build
 
-  # Job 4: Verify Docker Compose Build
+
   docker-compose-check:
     name: Verify Docker Compose Build
     runs-on: ubuntu-latest
@@ -107,7 +107,7 @@ jobs:
       - name: Build Images
         run: docker compose build
 
-  # Job 5: Deploy (CD)
+ 
   deploy:
     name: Deploy to Production
     needs: [node-backend-ci, python-backend-ci, frontend-ci, docker-compose-check]
