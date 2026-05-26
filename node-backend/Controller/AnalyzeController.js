@@ -41,7 +41,8 @@ const analyzeFile = (pythonEndpoint) => async (req, res) => {
 
         // Forward to Python AI microservice
         // Use native fetch to avoid axios dependency issues
-        const response = await fetch(`http://localhost:8000${pythonEndpoint}`, {
+        const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
+        const response = await fetch(`${pythonBackendUrl}${pythonEndpoint}`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -65,7 +66,8 @@ const analyzeText = (pythonEndpoint, key) => async (req, res) => {
             return res.status(400).json({ error: `${key} is required` });
         }
 
-        const response = await fetch(`http://localhost:8000${pythonEndpoint}`, {
+        const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || "http://localhost:8000";
+        const response = await fetch(`${pythonBackendUrl}${pythonEndpoint}`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"

@@ -1,0 +1,50 @@
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+    container_name: medassist_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - WDS_SOCKET_PORT=0
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - medassist_network
+
+  node-backend:
+    build:
+      context: ./node-backend
+    container_name: medassist_node_backend
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./node-backend/.env
+    environment:
+      - PYTHON_BACKEND_URL=http://python-backend:8000
+    volumes:
+      - ./node-backend:/app
+      - /app/node_modules
+    networks:
+      - medassist_network
+
+  python-backend:
+    build:
+      context: ./backend
+    container_name: medassist_python_backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+    networks:
+      - medassist_network
+
+networks:
+  medassist_network:
+    driver: bridge

@@ -150,9 +150,46 @@ async def analyze_medicine(data: MedicineRequest):
             "warnings": fda_data.get("warnings", ["No specific warnings"])[0],
             "precautions": fda_data.get("precautions", ["No precautions listed"])[0]
         }
-        return {"medicine": medicine_info}
+        
+        # Clean list items if they are returned as lists by OpenFDA
+        uses = medicine_info["uses"] if isinstance(medicine_info["uses"], str) else "\n".join(medicine_info["uses"])
+        side_effects = medicine_info["sideEffects"] if isinstance(medicine_info["sideEffects"], str) else "\n".join(medicine_info["sideEffects"])
+        warnings = medicine_info["warnings"] if isinstance(medicine_info["warnings"], str) else "\n".join(medicine_info["warnings"])
+        precautions = medicine_info["precautions"] if isinstance(medicine_info["precautions"], str) else "\n".join(medicine_info["precautions"])
+
+        markdown_response = f"""## {medicine_info['name']}
+**Generic Name:** {medicine_info['genericName']}
+
+### 📋 Indications & Usage
+{uses}
+
+### ⚠️ Warnings
+{warnings}
+
+### 🛑 Precautions
+{precautions}
+
+### ⚡ Side Effects
+{side_effects}"""
+
+        return {"response": markdown_response, "medicine": medicine_info}
     except Exception as e:
         print("Medicine Error:", e)
+        return {"error": str(e)}
+
+# --- DIET & LIFESTYLE ---
+class DietRequest(BaseModel):
+    userData: str
+
+@app.post("/analyze/diet")
+async def analyze_diet(data: DietRequest):
+    try:
+        prompt = f"You are a medical assistant and diet/lifestyle advisor.\nUser data:\n{data.userData}\n\nProvide a structured response using Markdown:\n## 1. Daily Calorie & Macronutrient Guidance\n## 2. Recommended Foods (What to eat)\n## 3. Foods to Avoid/Limit\n## 4. Lifestyle & Exercise Recommendations\n## 5. Important Medical Disclaimer & Precautions\n\n*Note: Always advise consulting a registered dietitian or doctor before making drastic dietary changes.*"
+        msg = [SystemMessage(content="You are a medical assistant."), HumanMessage(content=prompt)]
+        res = llm.invoke(msg)
+        return {"response": res.content}
+    except Exception as e:
+        print("Diet Error:", e)
         return {"error": str(e)}
 
 # --- CHAT ---
