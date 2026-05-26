@@ -8,6 +8,7 @@ function Chat() {
   const [messages, setMessages] = useState([]);
   const [history, setHistory] = useState([]);
   const [activeChatId, setActiveChatId] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -162,6 +163,58 @@ function Chat() {
 
   return (
     <div className="h-screen bg-[#090507] text-white flex font-sans overflow-hidden">
+      {/* Mobile Sidebar Drawer */}
+      {isSidebarOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 md:hidden flex">
+          <div className="w-[280px] bg-[#0c0406] border-r border-red-900/20 flex flex-col h-full relative p-6">
+            {/* Close Button */}
+            <button onClick={() => setIsSidebarOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            
+            <div className="flex items-center gap-2 mb-8 mt-4">
+              <div className="bg-[#c13024] p-1.5 rounded-lg flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/></svg>
+              </div>
+              <span className="font-bold text-xl">MedAssist</span>
+            </div>
+
+            <button onClick={() => { startNewConsultation(); setIsSidebarOpen(false); }} className="w-full bg-[#c13024] hover:bg-[#a6251a] p-3 rounded-xl font-medium transition-colors flex items-center gap-2 justify-center shadow-[0_0_15px_rgba(193,48,36,0.2)]">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+              New consultation
+            </button>
+
+            <div className="flex-1 overflow-y-auto mt-6">
+              <h3 className="text-gray-500 text-xs font-semibold tracking-wider mb-4 uppercase">History</h3>
+              {history.length === 0 ? (
+                <p className="text-gray-600 text-sm">No conversations yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {history.map(chat => (
+                    <button
+                      key={chat._id}
+                      onClick={() => { loadChat(chat._id); setIsSidebarOpen(false); }}
+                      className={`w-full text-left p-3 rounded-xl transition-colors truncate text-sm ${activeChatId === chat._id ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'}`}
+                    >
+                      {chat.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-auto pt-6 border-t border-red-900/20">
+              <button onClick={() => { handleLogout(); setIsSidebarOpen(false); }} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                Sign out
+              </button>
+            </div>
+          </div>
+          {/* Overlay Click Area */}
+          <div className="flex-1" onClick={() => setIsSidebarOpen(false)}></div>
+        </div>
+      )}
+
       {/* Sidebar */}
       <div className="hidden md:flex w-[280px] bg-[#0c0406] border-r border-red-900/20 flex-col">
         <div className="p-6">
@@ -209,19 +262,25 @@ function Chat() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col relative">
         {/* Header */}
-        <header className="flex justify-between items-center px-8 py-5 border-b border-white/5 bg-[#090507] z-10">
-          <div>
-            <h2 className="font-semibold text-lg">Medical assistant</h2>
-            <p className="text-gray-500 text-xs">Informational only · Not a substitute for professional care</p>
+        <header className="flex justify-between items-center px-4 md:px-8 py-5 border-b border-white/5 bg-[#090507] z-10">
+          <div className="flex items-center gap-3">
+            {/* Hamburger Button for Mobile */}
+            <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+            <div>
+              <h2 className="font-semibold text-base md:text-lg">Medical assistant</h2>
+              <p className="text-gray-500 text-[10px] md:text-xs">Informational only · Not a substitute for professional care</p>
+            </div>
           </div>
-          <Link to="/" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm">
+          <Link to="/" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-xs md:text-sm">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
             Home
           </Link>
         </header>
 
         {/* Chat Area */}
-        <div className="flex-1 overflow-y-auto p-8 flex flex-col">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col">
           {messages.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center max-w-3xl mx-auto w-full">
               <div className="bg-[#c13024] p-4 rounded-2xl mb-6 shadow-[0_0_30px_rgba(193,48,36,0.4)]">
@@ -261,7 +320,7 @@ function Chat() {
         </div>
 
         {/* Input Area */}
-        <div className="p-6 bg-[#090507] border-t border-white/5">
+        <div className="p-4 md:p-6 bg-[#090507] border-t border-white/5">
           <div className="max-w-3xl mx-auto relative flex items-center">
             <input 
               type="file" 

@@ -26,7 +26,7 @@ function Home() {
       {/* Background Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-red-900/20 blur-[120px] rounded-full pointer-events-none"></div>
 
-      <nav className="flex justify-between items-center px-12 py-6 relative z-10">
+      <nav className="flex justify-between items-center px-6 md:px-12 py-6 relative z-10">
         <div className="flex items-center gap-2">
           <div className="bg-[#c13024] p-1.5 rounded-lg flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/></svg>
@@ -58,13 +58,13 @@ function Home() {
         </div>
       </nav>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-6 relative z-10 text-center mt-12">
-        <div className="border border-red-900/40 bg-red-950/10 text-red-200/80 text-xs font-medium px-4 py-1.5 rounded-full mb-8 flex items-center gap-2">
+      <main className="flex-1 flex flex-col items-center justify-center px-4 md:px-6 relative z-10 text-center mt-8 md:mt-12">
+        <div className="border border-red-900/40 bg-red-950/10 text-red-200/80 text-[10px] md:text-xs font-medium px-4 py-1.5 rounded-full mb-6 md:mb-8 flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
           Evidence-based · Private · Always available
         </div>
 
-        <h1 className="text-7xl font-extrabold leading-tight max-w-4xl tracking-tight">
+        <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold leading-tight max-w-4xl tracking-tight">
           Your AI <span className="text-[#e87a71]">medical</span>
           <br />
           assistant for <span className="text-[#e87a71]">clearer</span>
@@ -72,7 +72,7 @@ function Home() {
           health <span className="text-[#e87a71]">answers</span>
         </h1>
 
-        <p className="text-gray-400 mt-8 text-lg max-w-2xl leading-relaxed">
+        <p className="text-gray-400 mt-6 md:mt-8 text-sm md:text-lg max-w-2xl leading-relaxed">
           Ask about symptoms, medications, conditions, and care pathways. MedAssist explains options in plain language and points you toward the right next step.
         </p>
 
@@ -103,7 +103,7 @@ function Home() {
         </div>
 
         {/* Feature Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl w-full mt-24 mb-16 text-left">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl w-full mt-16 md:mt-24 mb-16 text-left px-6 md:px-0">
           <div className="bg-[#120a0d] border border-red-900/20 p-8 rounded-2xl">
             <div className="w-10 h-10 bg-red-950/50 rounded-full flex items-center justify-center text-[#e87a71] mb-5">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/></svg>

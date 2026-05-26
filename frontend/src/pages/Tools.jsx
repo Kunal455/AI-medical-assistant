@@ -70,7 +70,7 @@ function Tools() {
     return (
         <div className="min-h-screen bg-[#090507] text-white flex flex-col font-sans">
             {/* Header */}
-            <header className="flex justify-between items-center px-8 py-5 border-b border-white/5 bg-[#090507]">
+            <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-6 md:px-8 py-5 gap-4 sm:gap-0 border-b border-white/5 bg-[#090507]">
                 <div>
                     <h2 className="font-semibold text-xl flex items-center gap-3">
                         <div className="bg-[#c13024] p-1.5 rounded-lg flex items-center justify-center">
@@ -86,41 +86,41 @@ function Tools() {
                 </div>
             </header>
 
-            <div className="flex flex-1 max-w-7xl mx-auto w-full p-8 gap-8">
+            <div className="flex flex-col md:flex-row flex-1 max-w-7xl mx-auto w-full p-4 md:p-8 gap-6 md:gap-8 overflow-hidden">
                 {/* Sidebar Navigation */}
-                <div className="w-64 space-y-2">
+                <div className="w-full md:w-64 flex md:flex-col gap-3 md:gap-2 overflow-x-auto md:overflow-x-visible pb-3 md:pb-0 scrollbar-none flex-shrink-0">
                     <button 
                         onClick={() => { setActiveTab("report"); setResponse(null); setFile(null); }}
-                        className={`w-full text-left p-4 rounded-xl transition-all ${activeTab === "report" ? "bg-[#c13024] text-white shadow-lg shadow-red-900/20" : "bg-[#130f11] text-gray-400 hover:bg-[#1a1518]"}`}
+                        className={`w-[220px] md:w-full text-left p-4 rounded-xl transition-all flex-shrink-0 md:flex-shrink ${activeTab === "report" ? "bg-[#c13024] text-white shadow-lg shadow-red-900/20" : "bg-[#130f11] text-gray-400 hover:bg-[#1a1518]"}`}
                     >
-                        <h3 className="font-semibold">Medical Report</h3>
-                        <p className="text-xs opacity-80 mt-1">Upload PDF or Image</p>
+                        <h3 className="font-semibold text-sm md:text-base">Medical Report</h3>
+                        <p className="text-[10px] md:text-xs opacity-80 mt-1">Upload PDF or Image</p>
                     </button>
                     <button 
                         onClick={() => { setActiveTab("prescription"); setResponse(null); setFile(null); }}
-                        className={`w-full text-left p-4 rounded-xl transition-all ${activeTab === "prescription" ? "bg-[#c13024] text-white shadow-lg shadow-red-900/20" : "bg-[#130f11] text-gray-400 hover:bg-[#1a1518]"}`}
+                        className={`w-[220px] md:w-full text-left p-4 rounded-xl transition-all flex-shrink-0 md:flex-shrink ${activeTab === "prescription" ? "bg-[#c13024] text-white shadow-lg shadow-red-900/20" : "bg-[#130f11] text-gray-400 hover:bg-[#1a1518]"}`}
                     >
-                        <h3 className="font-semibold">Prescription Reader</h3>
-                        <p className="text-xs opacity-80 mt-1">Extract medicines from image</p>
+                        <h3 className="font-semibold text-sm md:text-base">Prescription Reader</h3>
+                        <p className="text-[10px] md:text-xs opacity-80 mt-1">Extract medicines from image</p>
                     </button>
                     <button 
                         onClick={() => { setActiveTab("medicine"); setResponse(null); setTextInput(""); }}
-                        className={`w-full text-left p-4 rounded-xl transition-all ${activeTab === "medicine" ? "bg-[#c13024] text-white shadow-lg shadow-red-900/20" : "bg-[#130f11] text-gray-400 hover:bg-[#1a1518]"}`}
+                        className={`w-[220px] md:w-full text-left p-4 rounded-xl transition-all flex-shrink-0 md:flex-shrink ${activeTab === "medicine" ? "bg-[#c13024] text-white shadow-lg shadow-red-900/20" : "bg-[#130f11] text-gray-400 hover:bg-[#1a1518]"}`}
                     >
-                        <h3 className="font-semibold">Medicine Lookup</h3>
-                        <p className="text-xs opacity-80 mt-1">Uses & side effects</p>
+                        <h3 className="font-semibold text-sm md:text-base">Medicine Lookup</h3>
+                        <p className="text-[10px] md:text-xs opacity-80 mt-1">Uses & side effects</p>
                     </button>
                     <button 
                         onClick={() => { setActiveTab("diet"); setResponse(null); setTextInput(""); }}
-                        className={`w-full text-left p-4 rounded-xl transition-all ${activeTab === "diet" ? "bg-[#c13024] text-white shadow-lg shadow-red-900/20" : "bg-[#130f11] text-gray-400 hover:bg-[#1a1518]"}`}
+                        className={`w-[220px] md:w-full text-left p-4 rounded-xl transition-all flex-shrink-0 md:flex-shrink ${activeTab === "diet" ? "bg-[#c13024] text-white shadow-lg shadow-red-900/20" : "bg-[#130f11] text-gray-400 hover:bg-[#1a1518]"}`}
                     >
-                        <h3 className="font-semibold">Diet & Lifestyle</h3>
-                        <p className="text-xs opacity-80 mt-1">Personalized health plan</p>
+                        <h3 className="font-semibold text-sm md:text-base">Diet & Lifestyle</h3>
+                        <p className="text-[10px] md:text-xs opacity-80 mt-1">Personalized health plan</p>
                     </button>
                 </div>
 
                 {/* Main Content Area */}
-                <div className="flex-1 bg-[#130f11] border border-white/5 rounded-2xl p-8 overflow-y-auto">
+                <div className="flex-1 bg-[#130f11] border border-white/5 rounded-2xl p-4 md:p-8 overflow-y-auto">
                     {/* Medical Report & Prescription (File Upload) */}
                     {(activeTab === "report" || activeTab === "prescription") && (
                         <div>
