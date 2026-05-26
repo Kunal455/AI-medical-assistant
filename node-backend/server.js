@@ -16,12 +16,23 @@ const AnalyzeRouter = require("./Router/AnalyzeRouter");
 const app = express();
 
 // ================= MIDDLEWARE =================
+const allowedOrigins = [
+    "http://localhost:3000",
+    process.env.FRONTEND_URL
+].filter(Boolean).map(url => url.replace(/\/$/, ""));
+
 app.use(
   cors({
-    origin: [
-        "http://localhost:3000",
-        process.env.FRONTEND_URL
-    ].filter(Boolean),
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      const cleanOrigin = origin.replace(/\/$/, "");
+      if (allowedOrigins.includes(cleanOrigin) || cleanOrigin.endsWith(".vercel.app")) {
+        callback(null, true);
+      } else {
+        console.error(`CORS Blocked: Origin ${origin} is not in allowed origins:`, allowedOrigins);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   })
 );
