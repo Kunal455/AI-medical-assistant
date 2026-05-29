@@ -26,11 +26,12 @@ pipeline {
         }
 
         stage('Python Backend') {
-            steps {
-                dir('backend') {
-                    sh 'pip install -r requirements.txt'
-                }
-            }
+    steps {
+        dir('backend') {
+            sh 'python3 -m venv venv'
+            sh '. venv/bin/activate && pip install -r requirements.txt'
         }
+    }
+}
     }
 }
