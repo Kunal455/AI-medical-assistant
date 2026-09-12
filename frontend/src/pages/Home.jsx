@@ -36,13 +36,6 @@ function Home() {
 
         <div className="space-x-4 md:space-x-6 text-sm font-medium flex items-center">
           <Link
-            to="/reminder"
-            className="text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            Med Reminder
-          </Link>
-          <Link
             to="/tools"
             className="text-gray-300 hover:text-white transition-colors"
           >
@@ -89,14 +82,7 @@ function Home() {
           Ask about symptoms, medications, conditions, and care pathways. MedAssist explains options in plain language and points you toward the right next step.
         </p>
 
-        <div className="mt-10 flex flex-wrap justify-center gap-4">
-          <Link
-            to="/reminder"
-            className="bg-emerald-950/60 border border-emerald-500/40 hover:border-emerald-400 text-emerald-300 px-6 py-3.5 rounded-xl font-medium transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)] flex items-center gap-2"
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            Try Med Reminder Agent →
-          </Link>
+        <div className="mt-10 flex gap-4 justify-center">
           {isLoggedIn ? (
             <Link
               to="/chat"
@@ -132,12 +118,12 @@ function Home() {
             <p className="text-gray-400 text-xs leading-relaxed">Differentials and red-flag warnings, in plain language.</p>
           </div>
 
-          <div className="bg-[#120a0d] border border-emerald-900/30 p-6 rounded-2xl relative overflow-hidden">
-            <div className="w-10 h-10 bg-emerald-950/50 rounded-full flex items-center justify-center text-emerald-400 mb-4">
+          <div className="bg-[#120a0d] border border-red-900/20 p-6 rounded-2xl">
+            <div className="w-10 h-10 bg-red-950/50 rounded-full flex items-center justify-center text-[#e87a71] mb-4">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
             </div>
-            <h3 className="text-emerald-400 font-semibold text-base mb-1">Medication Reminder</h3>
-            <p className="text-gray-400 text-xs leading-relaxed">Real-time dose tracking, countdowns, and missed detection.</p>
+            <h3 className="text-[#e87a71] font-semibold text-base mb-1">Dose reminders</h3>
+            <p className="text-gray-400 text-xs leading-relaxed">Live medication tracking, countdowns, and active alerts in Chat.</p>
           </div>
 
           <div className="bg-[#120a0d] border border-red-900/20 p-6 rounded-2xl">
