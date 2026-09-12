@@ -1,5 +1,6 @@
 const Chat = require("../Model/Chat");
 const GeminiService = require("../Service/GeminiService");
+const MedicationReminderAgent = require("../Service/MedicationReminderAgent");
 
 const chatWithAI = async (req, res) => {
     try {
@@ -40,13 +41,22 @@ const chatWithAI = async (req, res) => {
         // Add current user message to history
         messageHistory.push({ role: 'user', content: symptoms });
 
-        // Call GeminiService
+        // Check Medication Reminder Agent first
+        const reminderResult = MedicationReminderAgent.run(symptoms);
         let aiResponseText = "";
-        try {
-            aiResponseText = await GeminiService.chat(messageHistory);
-        } catch (apiError) {
-            console.error("Gemini API Error:", apiError);
-            aiResponseText = "Sorry, I could not process that request at this time.";
+        let medicationAction = null;
+
+        if (reminderResult.handled) {
+            aiResponseText = reminderResult.response;
+            medicationAction = reminderResult.medication || null;
+        } else {
+            // Call GeminiService for standard medical consultations
+            try {
+                aiResponseText = await GeminiService.chat(messageHistory);
+            } catch (apiError) {
+                console.error("Gemini API Error:", apiError);
+                aiResponseText = "Sorry, I could not process that request at this time.";
+            }
         }
 
         // Save AI response
@@ -55,7 +65,9 @@ const chatWithAI = async (req, res) => {
 
         res.json({
             chatId: chat._id,
-            response: aiResponseText
+            response: aiResponseText,
+            medicationAction,
+            action: reminderResult.action || null
         });
     } catch (error) {
         console.error("Chat Error:", error.message);

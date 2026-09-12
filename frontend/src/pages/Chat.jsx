@@ -242,72 +242,17 @@ function Chat() {
     }
   };
 
-  // --- Advanced Time Parser ---
-  const parseTimesFromString = (str) => {
-    const times = [];
-    const clean = str.toLowerCase().replace(/at|and|,/g, " ");
 
-    // 1. Match 4-digit times with optional am/pm (e.g. 2341pm, 2341, 0930am, 0930)
-    const match4Digit = clean.match(/\b([012]\d)([0-5]\d)\s*(am|pm)?\b/gi);
-    if (match4Digit) {
-      match4Digit.forEach(t => {
-        const m = t.match(/(\d{2})(\d{2})\s*(am|pm)?/i);
-        if (m) {
-          let h = parseInt(m[1], 10);
-          const min = m[2];
-          const ampm = m[3] ? m[3].toLowerCase() : null;
-          if (ampm === "pm" && h < 12) h += 12;
-          if (ampm === "am" && h === 12) h = 0;
-          if (h >= 0 && h <= 23) {
-            times.push(`${String(h).padStart(2, "0")}:${min}`);
-          }
-        }
-      });
-    }
 
-    // 2. Match standard 12h/24h times with colons (e.g. 23:41, 11:41pm, 9:00 am, 9:30pm)
-    const matchColon = clean.match(/\b(\d{1,2}):(\d{2})\s*(am|pm)?\b/gi);
-    if (matchColon) {
-      matchColon.forEach(t => {
-        const m = t.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
-        if (m) {
-          let h = parseInt(m[1], 10);
-          const min = m[2];
-          const ampm = m[3] ? m[3].toLowerCase() : null;
-          if (ampm === "pm" && h < 12) h += 12;
-          if (ampm === "am" && h === 12) h = 0;
-          if (h >= 0 && h <= 23) {
-            times.push(`${String(h).padStart(2, "0")}:${min}`);
-          }
-        }
-      });
-    }
+  const sendMessage = async (textToSend) => {
+    const text = (textToSend || message).trim();
+    if (!text) return;
 
-    // 3. Match simple hour with am/pm (e.g. 9pm, 8am, 11pm)
-    const matchSimple = clean.match(/\b(\d{1,2})\s*(am|pm)\b/gi);
-    if (matchSimple) {
-      matchSimple.forEach(t => {
-        const m = t.match(/(\d{1,2})\s*(am|pm)/i);
-        if (m) {
-          let h = parseInt(m[1], 10);
-          const ampm = m[2].toLowerCase();
-          if (ampm === "pm" && h < 12) h += 12;
-          if (ampm === "am" && h === 12) h = 0;
-          if (h >= 0 && h <= 23) {
-            times.push(`${String(h).padStart(2, "0")}:00`);
-          }
-        }
-      });
-    }
+    setMessages(prev => [...prev, { role: "user", text }]);
+    setMessage("");
 
-    return Array.from(new Set(times));
-  };
-
-  // --- Process Reminder Command in Chat Stream ---
-  const processReminderCommand = (rawText) => {
-    const lower = rawText.toLowerCase().trim();
-
-    // 1. Clear memory
+    // Immediate optimistic action for quick dose / clear memory
+    const lower = text.toLowerCase();
     if (lower.includes("clear memory") || lower.includes("reset reminders") || lower.includes("clear all reminders")) {
       setSchedules([]);
       setDoseHistory([]);
@@ -316,11 +261,7 @@ function Chat() {
       localStorage.removeItem("medassist_schedules");
       localStorage.removeItem("medassist_dose_history");
       localStorage.removeItem("medassist_missed_doses");
-      return "🧹 All medication memory and schedules have been cleared from your account.";
-    }
-
-    // 2. Add quick dose for now
-    if (lower.includes("quick dose") || lower.includes("dose for now") || lower.includes("right now")) {
+    } else if (lower.includes("quick dose") || lower.includes("dose for now") || lower.includes("right now")) {
       const now = new Date();
       const h = String(now.getHours()).padStart(2, "0");
       const m = String(now.getMinutes()).padStart(2, "0");
@@ -339,153 +280,9 @@ function Chat() {
         times: [timeStr],
         active: true
       };
-
       setSchedules(prev => [...prev, newMed]);
-      return `Added **${formattedName}** for **${timeStr}** (Due right now!). The active reminder banner is now active for 1 minute at the top.`;
     }
 
-    // 3. Next dose query
-    if (lower.includes("next dose") || lower.includes("what is next") || lower.includes("upcoming dose")) {
-      const now = new Date();
-      const currentMinutesToday = now.getHours() * 60 + now.getMinutes();
-
-      let nextDoseInfo = null;
-      let minDiff = Infinity;
-
-      schedules.forEach((med) => {
-        med.times.forEach((t) => {
-          const [h, m] = t.split(":").map(Number);
-          const doseMinutes = h * 60 + m;
-          let diff = doseMinutes - currentMinutesToday;
-          if (diff <= 0) diff += 24 * 60;
-          if (diff < minDiff) {
-            minDiff = diff;
-            nextDoseInfo = {
-              name: med.name,
-              time: t,
-              diffHours: Math.floor(diff / 60),
-              diffMins: diff % 60,
-              isTomorrow: doseMinutes <= currentMinutesToday
-            };
-          }
-        });
-      });
-
-      if (!nextDoseInfo) {
-        return "You currently have no scheduled doses. You can schedule one anytime by typing e.g., *\"Add Paracetamol at 21:00\"* or *\"Add Amoxicillin at 08:00 and 20:00\"*.";
-      }
-
-      const timeRemainingStr = nextDoseInfo.diffHours > 0 
-        ? `${nextDoseInfo.diffHours}h ${nextDoseInfo.diffMins}m`
-        : `${nextDoseInfo.diffMins} minute${nextDoseInfo.diffMins === 1 ? '' : 's'}`;
-
-      return `Your next scheduled dose is **${nextDoseInfo.name}** at **${nextDoseInfo.time}** (${nextDoseInfo.isTomorrow ? 'Tomorrow' : 'Today'}, in **${timeRemainingStr}**).`;
-    }
-
-    // 4. Check schedule
-    if (lower.includes("check my schedule") || lower.includes("check schedule") || lower.includes("my schedule") || lower.includes("list medications")) {
-      if (schedules.length === 0) {
-        return "Your medication schedule is currently empty. Add a dose by typing e.g., *\"Add Paracetamol at 21:00\"*.";
-      }
-      let text = "### 📋 Your Active Medication Schedule:\n\n";
-      schedules.forEach(m => {
-        text += `- **${m.name}**: ${m.times.join(", ")}\n`;
-      });
-      text += `\n*Tracked live in the Dose Reminder Schedule panel.*`;
-      return text;
-    }
-
-    // 5. Add medication (e.g. "add paracetamol at 2341pm", "add paracetamol at 9pm", "remind me to take aspirin at 08:00 and 20:00")
-    if (lower.startsWith("add") || lower.includes("remind me to take") || lower.includes("schedule ") || lower.includes("reminder for")) {
-      const addMatch = lower.match(/(?:add|remind me to take|schedule|set reminder for)\s+(?:medicine\s+|drug\s+)?([a-zA-Z0-9\s]+?)\s+(?:at|every)\s+([0-9ap\s,.:and]+)/i);
-
-      if (addMatch) {
-        const rawMedName = addMatch[1].trim();
-        const rawTimeString = addMatch[2].trim();
-        const formattedName = rawMedName.charAt(0).toUpperCase() + rawMedName.slice(1);
-        const times = parseTimesFromString(rawTimeString);
-
-        if (times.length > 0) {
-          setSchedules(prev => {
-            const existingIndex = prev.findIndex(m => m.name.toLowerCase() === formattedName.toLowerCase());
-            if (existingIndex >= 0) {
-              const updated = [...prev];
-              const mergedTimes = Array.from(new Set([...updated[existingIndex].times, ...times])).sort();
-              updated[existingIndex] = { ...updated[existingIndex], times: mergedTimes };
-              return updated;
-            } else {
-              return [
-                ...prev,
-                {
-                  id: Date.now().toString(),
-                  name: formattedName,
-                  times: times.sort(),
-                  active: true
-                }
-              ];
-            }
-          });
-
-          const timesFormatted = times.map(t => `**${t}**`).join(" and ");
-          return `Added **${formattedName}** with scheduled times at ${timesFormatted}. Your live Dose Reminder Schedule on the right has been updated and will alert you right on time!`;
-        }
-      }
-    }
-
-    // 6. Delete / cancel medication
-    if (lower.startsWith("delete") || lower.startsWith("remove") || lower.startsWith("cancel")) {
-      const deleteMatch = lower.match(/(?:delete|remove|cancel)\s+(?:medicine\s+|drug\s+)?([a-zA-Z0-9\s]+)/i);
-      if (deleteMatch) {
-        const targetName = deleteMatch[1].trim().toLowerCase();
-        const exists = schedules.some(m => m.name.toLowerCase() === targetName);
-        if (exists) {
-          setSchedules(prev => prev.filter(m => m.name.toLowerCase() !== targetName));
-          return `Removed **${targetName}** from your medication reminder schedule.`;
-        }
-      }
-    }
-
-    return null; // Not a reminder command, forward to medical LLM
-  };
-
-  const sendMessage = async (textToSend) => {
-    const text = (textToSend || message).trim();
-    if (!text) return;
-
-    setMessages(prev => [...prev, { role: "user", text }]);
-    setMessage("");
-
-    // Check if this is a medication reminder instruction
-    const reminderResponse = processReminderCommand(text);
-
-    if (reminderResponse) {
-      // Add agent response immediately
-      setMessages(prev => [...prev, { role: "ai", text: reminderResponse }]);
-
-      // Also persist consultation in MongoDB via API
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ symptoms: text, chatId: activeChatId })
-        });
-        if (res.status === 401) {
-          navigate("/login");
-          return;
-        }
-        const data = await res.json();
-        if (!activeChatId && data.chatId) {
-          setActiveChatId(data.chatId);
-          fetchHistory();
-        }
-      } catch (err) {
-        console.error(err);
-      }
-      return;
-    }
-
-    // Standard medical AI consultation
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/chat`, {
         method: "POST",
@@ -502,6 +299,41 @@ function Chat() {
       }
 
       const data = await res.json();
+      
+      if (data.action === "clear_memory") {
+        setSchedules([]);
+        setDoseHistory([]);
+        setMissedDoses([]);
+        setActiveReminders([]);
+        localStorage.removeItem("medassist_schedules");
+        localStorage.removeItem("medassist_dose_history");
+        localStorage.removeItem("medassist_missed_doses");
+      } else if (data.action === "delete_medication" && data.medicationAction?.name) {
+        const target = data.medicationAction.name.toLowerCase();
+        setSchedules(prev => prev.filter(m => m.name.toLowerCase() !== target));
+      } else if (data.medicationAction && data.medicationAction.name && data.medicationAction.times) {
+        const { name, times } = data.medicationAction;
+        setSchedules(prev => {
+          const existingIndex = prev.findIndex(m => m.name.toLowerCase() === name.toLowerCase());
+          if (existingIndex >= 0) {
+            const updated = [...prev];
+            const mergedTimes = Array.from(new Set([...updated[existingIndex].times, ...times])).sort();
+            updated[existingIndex] = { ...updated[existingIndex], times: mergedTimes };
+            return updated;
+          } else {
+            return [
+              ...prev,
+              {
+                id: Date.now().toString(),
+                name,
+                times: times.sort(),
+                active: true
+              }
+            ];
+          }
+        });
+      }
+
       setMessages((prev) => [...prev, { role: "ai", text: data.response || "Sorry, I could not process that request." }]);
       
       if (!activeChatId && data.chatId) {
