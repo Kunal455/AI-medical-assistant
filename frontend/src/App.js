@@ -5,6 +5,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Chat from "./pages/Chat";
 import Tools from "./pages/Tools";
+import MedicationReminder from "./pages/MedicationReminder";
 
 function App(){
 
@@ -23,6 +24,10 @@ function App(){
         <Route path="/chat" element={<Chat />} />
 
         <Route path="/tools" element={<Tools />} />
+
+        <Route path="/reminder" element={<MedicationReminder />} />
+
+        <Route path="/reminders" element={<MedicationReminder />} />
 
       </Routes>
 

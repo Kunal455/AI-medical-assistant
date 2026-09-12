@@ -117,6 +117,19 @@ function Tools() {
                         <h3 className="font-semibold text-sm md:text-base">Diet & Lifestyle</h3>
                         <p className="text-[10px] md:text-xs opacity-80 mt-1">Personalized health plan</p>
                     </button>
+                    <Link 
+                        to="/reminder"
+                        className="w-[220px] md:w-full text-left p-4 rounded-xl transition-all flex-shrink-0 md:flex-shrink bg-gradient-to-r from-emerald-950/40 to-teal-950/20 border border-emerald-500/30 text-emerald-300 hover:border-emerald-400/60 flex items-center justify-between"
+                    >
+                        <div>
+                            <div className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                <h3 className="font-semibold text-sm md:text-base text-white">Med Reminder Agent</h3>
+                            </div>
+                            <p className="text-[10px] md:text-xs text-emerald-400/80 mt-1">Live active dose tracker</p>
+                        </div>
+                        <span className="text-xs bg-emerald-500/20 px-2 py-0.5 rounded text-emerald-300 font-mono">LIVE</span>
+                    </Link>
                 </div>
 
                 {/* Main Content Area */}

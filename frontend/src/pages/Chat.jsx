@@ -273,10 +273,18 @@ function Chat() {
               <p className="text-gray-500 text-[10px] md:text-xs">Informational only · Not a substitute for professional care</p>
             </div>
           </div>
-          <Link to="/" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-xs md:text-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-            Home
-          </Link>
+          <div className="flex items-center gap-4 md:gap-6">
+            <Link to="/reminder" className="flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 transition-colors text-xs md:text-sm font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Med Reminder
+            </Link>
+            <Link to="/tools" className="text-gray-400 hover:text-white transition-colors text-xs md:text-sm font-medium">
+              Tools
+            </Link>
+            <Link to="/" className="flex items-center gap-1 text-gray-400 hover:text-white transition-colors text-xs md:text-sm font-medium">
+              Home
+            </Link>
+          </div>
         </header>
 
         {/* Chat Area */}
