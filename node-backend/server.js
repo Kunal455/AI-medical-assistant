@@ -12,6 +12,7 @@ const UserRouter = require("./Router/UserRouter");
 const MedicalRouter = require("./Router/MedicalRouter");
 const ChatRouter = require("./Router/ChatRouter");
 const AnalyzeRouter = require("./Router/AnalyzeRouter");
+const MedicationRouter = require("./Router/MedicationRouter");
 
 const app = express();
 
@@ -47,6 +48,7 @@ app.use("/api/v1/user", UserRouter);
 app.use("/api/v1/medical", MedicalRouter);
 app.use("/api/v1/chat", ChatRouter);
 app.use("/api/v1/analyze", AnalyzeRouter);
+app.use("/api/v1/medication", MedicationRouter);
 
 
 

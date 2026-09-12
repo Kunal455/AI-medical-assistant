@@ -6,21 +6,57 @@ import { API_BASE_URL } from "../config";
 function MedicationReminder() {
   const navigate = useNavigate();
 
-  // Auth guard: strictly allow access only after login
+  // Auth guard and initial MongoDB medication fetch
   useEffect(() => {
-    const checkAuth = async () => {
+    const initData = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/v1/user/profile`, {
           credentials: "include"
         });
         if (res.status === 401 || !res.ok) {
           navigate("/login");
+          return;
+        }
+
+        // Fetch user medications from MongoDB
+        const medRes = await fetch(`${API_BASE_URL}/api/v1/medication`, {
+          credentials: "include"
+        });
+        if (medRes.ok) {
+          const data = await medRes.json();
+          if (data.medications && data.medications.length > 0) {
+            setSchedules(data.medications.map(m => ({
+              id: m._id,
+              name: m.name,
+              times: m.times,
+              active: m.active
+            })));
+          }
+          if (data.doseHistory && data.doseHistory.length > 0) {
+            setDoseHistory(data.doseHistory.map(d => ({
+              key: d.doseKey,
+              medName: d.medName,
+              time: d.time,
+              takenAt: d.takenAt,
+              date: d.date
+            })));
+          }
+          if (data.missedDoses && data.missedDoses.length > 0) {
+            setMissedDoses(data.missedDoses.map(m => ({
+              key: m.doseKey,
+              medName: m.medName,
+              time: m.time,
+              formatted12: m.formatted12,
+              date: m.date,
+              missedAt: m.missedAt
+            })));
+          }
         }
       } catch (err) {
         navigate("/login");
       }
     };
-    checkAuth();
+    initData();
   }, [navigate]);
 
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -34,14 +70,7 @@ function MedicationReminder() {
         console.error("Failed to parse saved schedules", e);
       }
     }
-    const now = new Date();
-    const currH = String(now.getHours()).padStart(2, "0");
-    const currM = String(now.getMinutes()).padStart(2, "0");
-    return [
-      { id: "1", name: "Paracetamol", times: [`${currH}:${currM}`], active: true },
-      { id: "2", name: "Thicolochine", times: ["21:30"], active: true },
-      { id: "3", name: "D", times: ["21:34"], active: true }
-    ];
+    return [];
   });
 
   const [doseHistory, setDoseHistory] = useState(() => {

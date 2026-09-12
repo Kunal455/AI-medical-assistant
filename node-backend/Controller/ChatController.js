@@ -1,4 +1,5 @@
 const Chat = require("../Model/Chat");
+const Medication = require("../Model/Medication");
 const GeminiService = require("../Service/GeminiService");
 const MedicationReminderAgent = require("../Service/MedicationReminderAgent");
 
@@ -49,6 +50,37 @@ const chatWithAI = async (req, res) => {
         if (reminderResult.handled) {
             aiResponseText = reminderResult.response;
             medicationAction = reminderResult.medication || null;
+
+            // Persist to MongoDB Medication collection
+            if (reminderResult.action === "add_medication" && medicationAction && medicationAction.name && medicationAction.times) {
+                const formattedName = medicationAction.name.trim().charAt(0).toUpperCase() + medicationAction.name.trim().slice(1);
+                let med = await Medication.findOne({
+                    userId,
+                    name: { $regex: new RegExp(`^${formattedName}$`, 'i') }
+                });
+
+                if (med) {
+                    const mergedTimes = Array.from(new Set([...med.times, ...medicationAction.times])).sort();
+                    med.times = mergedTimes;
+                    med.active = true;
+                    await med.save();
+                } else {
+                    med = new Medication({
+                        userId,
+                        name: formattedName,
+                        times: medicationAction.times.sort(),
+                        active: true
+                    });
+                    await med.save();
+                }
+            } else if (reminderResult.action === "delete_medication" && medicationAction && medicationAction.name) {
+                await Medication.findOneAndDelete({
+                    userId,
+                    name: { $regex: new RegExp(`^${medicationAction.name.trim()}$`, 'i') }
+                });
+            } else if (reminderResult.action === "clear_memory") {
+                await Medication.deleteMany({ userId });
+            }
         } else {
             // Call GeminiService for standard medical consultations
             try {

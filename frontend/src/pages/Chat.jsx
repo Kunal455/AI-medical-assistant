@@ -155,17 +155,24 @@ function Chat() {
             const h12 = String(schH % 12 || 12).padStart(2, "0");
             const time12Str = `${h12}:${String(schM).padStart(2, "0")} ${ampm}`;
 
-            setMissedDoses((prev) => [
-              ...prev,
-              {
-                key: doseKey,
-                medName: med.name,
-                time: timeStr,
-                formatted12: time12Str,
-                date: todayDateStr,
-                missedAt: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-              }
-            ]);
+            const missedRecord = {
+              doseKey,
+              medName: med.name,
+              time: timeStr,
+              formatted12: time12Str,
+              date: todayDateStr,
+              missedAt: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            };
+
+            setMissedDoses((prev) => [...prev, missedRecord]);
+
+            // Persist missed dose to MongoDB
+            fetch(`${API_BASE_URL}/api/v1/medication/missed`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify(missedRecord)
+            }).catch(() => {});
           }
         });
       });
@@ -183,11 +190,52 @@ function Chat() {
     return () => clearInterval(timer);
   }, [schedules, doseHistory, missedDoses]);
 
-  // Auth check & History fetch
+  // Auth check, History & MongoDB Medication fetch
   useEffect(() => {
     fetchHistory();
+    fetchMedications();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const fetchMedications = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/medication`, {
+        credentials: "include"
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.medications && data.medications.length > 0) {
+          setSchedules(data.medications.map(m => ({
+            id: m._id,
+            name: m.name,
+            times: m.times,
+            active: m.active
+          })));
+        }
+        if (data.doseHistory && data.doseHistory.length > 0) {
+          setDoseHistory(data.doseHistory.map(d => ({
+            key: d.doseKey,
+            medName: d.medName,
+            time: d.time,
+            takenAt: d.takenAt,
+            date: d.date
+          })));
+        }
+        if (data.missedDoses && data.missedDoses.length > 0) {
+          setMissedDoses(data.missedDoses.map(m => ({
+            key: m.doseKey,
+            medName: m.medName,
+            time: m.time,
+            formatted12: m.formatted12,
+            date: m.date,
+            missedAt: m.missedAt
+          })));
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch medications from MongoDB", err);
+    }
+  };
 
   const fetchHistory = async () => {
     try {
@@ -401,57 +449,119 @@ function Chat() {
     }
   };
 
-  // Reminder Actions
-  const handleMarkTaken = (reminder) => {
+  // Reminder Actions with MongoDB Synchronization
+  const handleMarkTaken = async (reminder) => {
     const now = new Date();
     const todayDateStr = now.toDateString();
     const doseKey = reminder.key || `${reminder.medName}-${reminder.time}-${todayDateStr}`;
 
-    setDoseHistory((prev) => [
-      ...prev,
-      {
-        key: doseKey,
-        medName: reminder.medName,
-        time: reminder.time,
-        takenAt: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        date: todayDateStr
-      }
-    ]);
+    const newRecord = {
+      key: doseKey,
+      medName: reminder.medName,
+      time: reminder.time,
+      takenAt: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      date: todayDateStr
+    };
 
+    setDoseHistory((prev) => [...prev, newRecord]);
     setActiveReminders((prev) => prev.filter((r) => r.key !== doseKey));
+
+    try {
+      await fetch(`${API_BASE_URL}/api/v1/medication/taken`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          doseKey,
+          medName: reminder.medName,
+          time: reminder.time,
+          date: todayDateStr,
+          takenAt: newRecord.takenAt
+        })
+      });
+    } catch (err) {
+      console.error("Failed to mark taken in MongoDB", err);
+    }
   };
 
-  const handleTakeLate = (missedItem) => {
+  const handleTakeLate = async (missedItem) => {
     const now = new Date();
     const todayDateStr = now.toDateString();
 
-    setDoseHistory((prev) => [
-      ...prev,
-      {
-        key: missedItem.key,
-        medName: missedItem.medName,
-        time: missedItem.time,
-        takenAt: `${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (Late)`,
-        date: todayDateStr
-      }
-    ]);
+    const newRecord = {
+      key: missedItem.key,
+      medName: missedItem.medName,
+      time: missedItem.time,
+      takenAt: `${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (Late)`,
+      date: todayDateStr
+    };
 
+    setDoseHistory((prev) => [...prev, newRecord]);
     setMissedDoses((prev) => prev.filter((m) => m.key !== missedItem.key));
+
+    try {
+      await fetch(`${API_BASE_URL}/api/v1/medication/take-late`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          doseKey: missedItem.key,
+          medName: missedItem.medName,
+          time: missedItem.time,
+          date: todayDateStr,
+          takenAt: newRecord.takenAt
+        })
+      });
+    } catch (err) {
+      console.error("Failed to mark late dose in MongoDB", err);
+    }
   };
 
-  const handleManualAddDose = (e) => {
+  const handleManualAddDose = async (e) => {
     e.preventDefault();
     if (!newMedName.trim() || !newMedTime.trim()) return;
 
     const formattedName = newMedName.trim().charAt(0).toUpperCase() + newMedName.trim().slice(1);
-    const newMed = {
-      id: Date.now().toString(),
-      name: formattedName,
-      times: [newMedTime],
-      active: true
-    };
+    
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/medication`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: formattedName,
+          times: [newMedTime]
+        })
+      });
 
-    setSchedules((prev) => [...prev, newMed]);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.medication) {
+          setSchedules((prev) => {
+            const existingIndex = prev.findIndex((m) => m.name.toLowerCase() === formattedName.toLowerCase());
+            if (existingIndex >= 0) {
+              const updated = [...prev];
+              const mergedTimes = Array.from(new Set([...updated[existingIndex].times, newMedTime])).sort();
+              updated[existingIndex] = { ...updated[existingIndex], times: mergedTimes };
+              return updated;
+            } else {
+              return [
+                ...prev,
+                {
+                  id: data.medication._id || Date.now().toString(),
+                  name: formattedName,
+                  times: [newMedTime],
+                  active: true
+                }
+              ];
+            }
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to add medication to MongoDB", err);
+    }
+
     setNewMedName("");
     setNewMedTime("");
     setShowAddModal(false);
