@@ -8,14 +8,19 @@ function MedicationReminder() {
     const saved = localStorage.getItem("medassist_schedules");
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed.length > 0) return parsed;
       } catch (e) {
         console.error("Failed to parse saved schedules", e);
       }
     }
-    // Default initial schedule for demonstration
+    const now = new Date();
+    const currH = String(now.getHours()).padStart(2, "0");
+    const currM = String(now.getMinutes()).padStart(2, "0");
     return [
-      { id: "1", name: "Paracetamol", times: ["21:00"], active: true }
+      { id: "1", name: "Paracetamol", times: [`${currH}:${currM}`], active: true },
+      { id: "2", name: "Thicolochine", times: ["21:30"], active: true },
+      { id: "3", name: "D", times: ["21:34"], active: true }
     ];
   });
 
@@ -26,7 +31,23 @@ function MedicationReminder() {
 
   const [missedDoses, setMissedDoses] = useState(() => {
     const saved = localStorage.getItem("medassist_missed_doses");
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return [
+      {
+        key: "Paracetamol-21:00-demo",
+        medName: "Paracetamol",
+        time: "21:00",
+        formatted12: "09:00 PM",
+        date: new Date().toDateString()
+      }
+    ];
   });
 
   const [activeReminders, setActiveReminders] = useState([]);
@@ -48,7 +69,6 @@ function MedicationReminder() {
   const chatEndRef = useRef(null);
   const audioContextRef = useRef(null);
 
-  // Save to LocalStorage whenever state changes
   useEffect(() => {
     localStorage.setItem("medassist_schedules", JSON.stringify(schedules));
   }, [schedules]);
@@ -61,7 +81,6 @@ function MedicationReminder() {
     localStorage.setItem("medassist_missed_doses", JSON.stringify(missedDoses));
   }, [missedDoses]);
 
-  // Web Audio Synth Chime for Reminders
   const playChime = () => {
     try {
       if (!audioContextRef.current) {
@@ -74,20 +93,17 @@ function MedicationReminder() {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sine";
-      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15); // A5
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
       gain.gain.setValueAtTime(0.3, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 0.6);
-    } catch (e) {
-      // Audio playback might be restricted without user interaction
-    }
+    } catch (e) {}
   };
 
-  // Clock tick & reminder evaluation
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date();
@@ -101,8 +117,6 @@ function MedicationReminder() {
       setSecondsRemaining(currentRemaining);
 
       const todayDateStr = now.toDateString();
-
-      // Check all scheduled doses for the current minute
       const dueRightNow = [];
 
       schedules.forEach((med) => {
@@ -110,39 +124,41 @@ function MedicationReminder() {
         med.times.forEach((timeStr) => {
           const doseKey = `${med.name}-${timeStr}-${todayDateStr}`;
 
-          // Check if already taken today
-          const alreadyTaken = doseHistory.some(
-            (item) => item.key === doseKey
-          );
-
-          // Check if already marked missed today
-          const alreadyMissed = missedDoses.some(
-            (item) => item.key === doseKey
-          );
+          const alreadyTaken = doseHistory.some((item) => item.key === doseKey);
+          const alreadyMissed = missedDoses.some((item) => item.key === doseKey);
 
           if (timeStr === currentTimeStr && !alreadyTaken && !alreadyMissed) {
+            const [h, m] = timeStr.split(":").map(Number);
+            const ampm = h >= 12 ? "PM" : "AM";
+            const h12 = String(h % 12 || 12).padStart(2, "0");
+            const time12Str = `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+
             dueRightNow.push({
               key: doseKey,
               medId: med.id,
               medName: med.name,
               time: timeStr,
+              formatted12: time12Str,
               dueAt: now
             });
           }
 
-          // If the scheduled minute has passed today and wasn't taken or marked missed
           const [schH, schM] = timeStr.split(":").map(Number);
           const scheduledDate = new Date(now);
           scheduledDate.setHours(schH, schM, 59, 999);
 
           if (now > scheduledDate && !alreadyTaken && !alreadyMissed) {
-            // Mark as missed
+            const ampm = schH >= 12 ? "PM" : "AM";
+            const h12 = String(schH % 12 || 12).padStart(2, "0");
+            const time12Str = `${h12}:${String(schM).padStart(2, "0")} ${ampm}`;
+
             setMissedDoses((prev) => [
               ...prev,
               {
                 key: doseKey,
                 medName: med.name,
                 time: timeStr,
+                formatted12: time12Str,
                 date: todayDateStr,
                 missedAt: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               }
@@ -151,7 +167,6 @@ function MedicationReminder() {
         });
       });
 
-      // Update active reminders list
       if (dueRightNow.length > 0) {
         setActiveReminders(dueRightNow);
         if (currentSeconds === 0 || currentSeconds === 1) {
@@ -165,12 +180,10 @@ function MedicationReminder() {
     return () => clearInterval(timer);
   }, [schedules, doseHistory, missedDoses]);
 
-  // Scroll chat to bottom on new message
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Handle Mark as Taken
   const handleMarkTaken = (reminder) => {
     const now = new Date();
     const todayDateStr = now.toDateString();
@@ -187,10 +200,8 @@ function MedicationReminder() {
       }
     ]);
 
-    // Remove from active reminders immediately
     setActiveReminders((prev) => prev.filter((r) => r.key !== doseKey));
 
-    // Add confirmation message to chat
     setMessages((prev) => [
       ...prev,
       {
@@ -201,7 +212,24 @@ function MedicationReminder() {
     ]);
   };
 
-  // Clear all memory & schedules
+  const handleTakeLate = (missedItem) => {
+    const now = new Date();
+    const todayDateStr = now.toDateString();
+
+    setDoseHistory((prev) => [
+      ...prev,
+      {
+        key: missedItem.key,
+        medName: missedItem.medName,
+        time: missedItem.time,
+        takenAt: `${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (Late)`,
+        date: todayDateStr
+      }
+    ]);
+
+    setMissedDoses((prev) => prev.filter((m) => m.key !== missedItem.key));
+  };
+
   const handleClearMemory = () => {
     setSchedules([]);
     setDoseHistory([]);
@@ -221,42 +249,35 @@ function MedicationReminder() {
     ]);
   };
 
-  // Parse natural language and respond
   const handleSendMessage = async (textToSend) => {
     const text = (textToSend || inputText).trim();
     if (!text) return;
 
-    // Add user message
     const userMsg = { id: Date.now().toString(), role: "user", text };
     setMessages((prev) => [...prev, userMsg]);
     setInputText("");
     setIsTyping(true);
 
-    // Natural Language Parsing
     setTimeout(() => {
       processNaturalLanguageCommand(text);
       setIsTyping(false);
-    }, 450);
+    }, 400);
   };
 
-  // Natural Language Processor for Dose Reminders
   const processNaturalLanguageCommand = (rawText) => {
     const lower = rawText.toLowerCase();
 
-    // 1. Clear Memory
     if (lower.includes("clear memory") || lower.includes("reset all") || lower.includes("clear all")) {
       handleClearMemory();
       return;
     }
 
-    // 2. Add quick dose for now
     if (lower.includes("quick dose") || lower.includes("dose for now") || lower.includes("right now")) {
       const now = new Date();
       const h = String(now.getHours()).padStart(2, "0");
       const m = String(now.getMinutes()).padStart(2, "0");
       const timeStr = `${h}:${m}`;
       
-      // Check if medicine name is specified
       let name = "Paracetamol";
       const nameMatch = lower.match(/add (?:quick dose for |medicine |dose for )?([a-zA-Z0-9\s]+?)(?: at| right now| now|$)/i);
       if (nameMatch && nameMatch[1] && !nameMatch[1].includes("now") && !nameMatch[1].includes("dose")) {
@@ -277,13 +298,12 @@ function MedicationReminder() {
         {
           id: (Date.now() + 1).toString(),
           role: "ai",
-          text: `Added **${newMed.name}** with scheduled time **${timeStr}** (Due right now!). The active reminder banner is now active for 1 minute.`
+          text: `Added **${newMed.name}** with scheduled time **${timeStr}** (Due right now!). The active reminder banner is now active.`
         }
       ]);
       return;
     }
 
-    // 3. What is my next dose?
     if (lower.includes("next dose") || lower.includes("what is next") || lower.includes("upcoming dose")) {
       const now = new Date();
       const currentMinutesToday = now.getHours() * 60 + now.getMinutes();
@@ -297,7 +317,7 @@ function MedicationReminder() {
           const doseMinutes = h * 60 + m;
           let diff = doseMinutes - currentMinutesToday;
           if (diff <= 0) {
-            diff += 24 * 60; // Next day
+            diff += 24 * 60;
           }
           if (diff < minDiff) {
             minDiff = diff;
@@ -338,7 +358,6 @@ function MedicationReminder() {
       return;
     }
 
-    // 4. Check schedule / list medicines
     if (lower.includes("check my schedule") || lower.includes("schedule") || lower.includes("list") || lower.includes("my medicines")) {
       if (schedules.length === 0) {
         setMessages((prev) => [
@@ -367,20 +386,15 @@ function MedicationReminder() {
       return;
     }
 
-    // 5. Add medicine: Regex to extract medicine name and time(s)
-    // Matches e.g. "Add medicine paracetamol at 9pm" or "Add Amoxicillin at 08:00 and 20:00"
     const addMatch = lower.match(/(?:add|remind me to take|schedule)\s+(?:medicine\s+|drug\s+)?([a-zA-Z0-9\s]+?)\s+(?:at|every)\s+([0-9ap\s,.:and]+)/i);
 
     if (addMatch) {
       const rawMedName = addMatch[1].trim();
       const rawTimeString = addMatch[2].trim();
       const formattedName = rawMedName.charAt(0).toUpperCase() + rawMedName.slice(1);
-
-      // Extract all time representations
       const times = parseTimesFromString(rawTimeString);
 
       if (times.length > 0) {
-        // Add or update medicine in schedule
         setSchedules((prev) => {
           const existingIndex = prev.findIndex(
             (m) => m.name.toLowerCase() === formattedName.toLowerCase()
@@ -416,7 +430,6 @@ function MedicationReminder() {
       }
     }
 
-    // 6. Delete / Remove medicine
     const deleteMatch = lower.match(/(?:delete|remove|cancel)\s+(?:medicine\s+|drug\s+)?([a-zA-Z0-9\s]+)/i);
     if (deleteMatch) {
       const targetName = deleteMatch[1].trim().toLowerCase();
@@ -435,24 +448,21 @@ function MedicationReminder() {
       }
     }
 
-    // Fallback response with helpful hints
     setMessages((prev) => [
       ...prev,
       {
         id: (Date.now() + 1).toString(),
         role: "ai",
-        text: `I understood: *"${rawText}"*.\n\nYou can manage reminders using commands like:\n- **"Add Paracetamol at 09:00 and 21:00"**\n- **"Add Quick Dose for Now"** (triggers 1-minute live reminder immediately)\n- **"What is my next dose?"**\n- **"Check my schedule"**\n- **"Clear memory"**`
+        text: `I understood: *"${rawText}"*.\n\nYou can manage reminders using commands like:\n- **"Add Paracetamol at 09:00 and 21:00"**\n- **"Add Quick Dose for Now"**\n- **"What is my next dose?"**\n- **"Check my schedule"**\n- **"Clear memory"**`
       }
     ]);
   };
 
-  // Helper: parse times like "9pm", "08:00 and 20:00", "8am, 2pm, 8pm", "21:00"
   const parseTimesFromString = (str) => {
     const times = [];
     const tokens = str.split(/(?:and|,|\s+)/).map(s => s.trim()).filter(Boolean);
 
     tokens.forEach((token) => {
-      // 12-hour format e.g. 9pm, 9:30am, 9am
       const match12 = token.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
       if (match12) {
         let hour = parseInt(match12[1], 10);
@@ -464,14 +474,12 @@ function MedicationReminder() {
         return;
       }
 
-      // 24-hour format e.g. 21:00, 08:00
       const match24 = token.match(/^([01]?[0-9]|2[0-3]):([0-5][0-9])$/);
       if (match24) {
         times.push(`${match24[1].padStart(2, "0")}:${match24[2]}`);
         return;
       }
 
-      // Single number like "9" if surrounded by context
       if (/^\d{1,2}$/.test(token)) {
         const h = parseInt(token, 10);
         if (h >= 0 && h <= 23) {
@@ -483,7 +491,6 @@ function MedicationReminder() {
     return Array.from(new Set(times));
   };
 
-  // Calculate next due doses for display in right panel
   const getNextDueDoses = () => {
     const now = currentTime;
     const currentMins = now.getHours() * 60 + now.getMinutes();
@@ -493,14 +500,19 @@ function MedicationReminder() {
       med.times.forEach((t) => {
         const [h, m] = t.split(":").map(Number);
         const doseMins = h * 60 + m;
-        // Only include if in the future today
         if (doseMins > currentMins) {
           const diff = doseMins - currentMins;
+          const ampm = h >= 12 ? "PM" : "AM";
+          const h12 = String(h % 12 || 12).padStart(2, "0");
+          const time12 = `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+
           list.push({
             name: med.name,
             time: t,
+            time12,
             diffMinutes: diff,
-            diffFormatted: diff > 60 ? `in ${Math.floor(diff / 60)}h ${diff % 60}m` : `in ${diff}m`
+            diffFormatted: diff > 60 ? `in ${Math.floor(diff / 60)}h ${diff % 60}m` : `in ${diff}m`,
+            key: `${med.name}-${t}-${now.toDateString()}`
           });
         }
       });
@@ -510,8 +522,8 @@ function MedicationReminder() {
   };
 
   const nextDueList = getNextDueDoses();
+  const earliestNext = nextDueList.length > 0 ? nextDueList[0].time : null;
 
-  // Format digital clock
   const hours = currentTime.getHours();
   const minutes = String(currentTime.getMinutes()).padStart(2, "0");
   const seconds = String(currentTime.getSeconds()).padStart(2, "0");
@@ -520,14 +532,12 @@ function MedicationReminder() {
   const formattedLiveClock = `${displayHours}:${minutes}:${seconds} ${ampm}`;
   const formatted24H = `${String(hours).padStart(2, "0")}:${minutes}`;
 
-  // Date formatted
   const formattedDate = currentTime.toLocaleDateString("en-US", {
     month: "short",
     day: "2-digit",
     year: "numeric"
   });
 
-  // Manual Add Schedule submit
   const handleAddManualSchedule = (e) => {
     e.preventDefault();
     if (!newMedName.trim() || !newMedTime.trim()) return;
@@ -560,8 +570,8 @@ function MedicationReminder() {
       {/* Top Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center px-6 md:px-8 py-4 border-b border-white/5 bg-[#090507] gap-4 md:gap-0">
         <div className="flex items-center gap-3.5">
-          {/* Pill / Capsule Icon Badge */}
-          <div className="w-10 h-10 rounded-xl bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-400 shadow-[0_0_15px_rgba(20,184,166,0.25)]">
+          {/* Brand Icon Badge */}
+          <div className="w-10 h-10 rounded-xl bg-red-950/60 border border-red-500/30 flex items-center justify-center text-[#e87a71] shadow-[0_0_15px_rgba(193,48,36,0.3)]">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/>
               <path d="m8.5 8.5 7 7"/>
@@ -573,8 +583,8 @@ function MedicationReminder() {
               <h1 className="font-bold text-lg md:text-xl text-white tracking-tight">
                 MedAssist - Medication Reminder Agent
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-950/80 border border-red-500/40 text-[#e87a71] flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#c13024] animate-pulse"></span>
                 CSE476 • Live Reminders
               </span>
             </div>
@@ -586,10 +596,10 @@ function MedicationReminder() {
 
         {/* Right Header: Digital Clock & Clear Memory */}
         <div className="flex items-center gap-3 self-end md:self-auto">
-          <div className="bg-[#130f11] border border-white/10 px-4 py-2 rounded-xl flex items-center gap-3 shadow-inner">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <div className="bg-[#130f11] border border-red-900/30 px-4 py-2 rounded-xl flex items-center gap-3 shadow-inner">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#c13024] animate-pulse"></span>
             <div>
-              <div className="font-mono font-bold text-sm text-emerald-400 tracking-wider">
+              <div className="font-mono font-bold text-sm text-[#e87a71] tracking-wider">
                 {formattedLiveClock}
               </div>
               <div className="text-[10px] text-gray-500">
@@ -621,11 +631,11 @@ function MedicationReminder() {
         </div>
       </header>
 
-      {/* ACTIVE REMINDER (DUE NOW) TOP BANNER (Visible when reminders are active) */}
+      {/* ACTIVE REMINDER (DUE NOW) TOP BANNER */}
       {activeReminders.length > 0 && (
-        <div className="bg-gradient-to-r from-[#290d20] via-[#1d0e1c] to-[#0d1c1a] border-b border-[#c13024]/50 px-6 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-4 animate-fadeIn shadow-[0_4px_25px_rgba(193,48,36,0.25)]">
+        <div className="bg-gradient-to-r from-[#1c080d] via-[#14080b] to-[#0c0406] border-b border-[#c13024]/60 px-6 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_4px_25px_rgba(193,48,36,0.3)]">
           <div className="flex items-center gap-3.5 w-full sm:w-auto">
-            <div className="w-10 h-10 rounded-xl bg-purple-950/80 border border-purple-500/50 flex items-center justify-center text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.4)] animate-bounce">
+            <div className="w-10 h-10 rounded-xl bg-red-950/80 border border-red-500/40 flex items-center justify-center text-[#e87a71] shadow-[0_0_15px_rgba(193,48,36,0.3)] animate-pulse">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
                 <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
@@ -633,26 +643,26 @@ function MedicationReminder() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 bg-purple-500/30 text-purple-300 border border-purple-400/40 rounded text-[10px] font-bold tracking-wide">
+                <span className="px-2.5 py-0.5 bg-red-950/90 text-[#e87a71] border border-red-500/40 font-bold text-[10px] rounded tracking-wide">
                   ACTIVE REMINDER (DUE NOW)
                 </span>
                 <span className="font-semibold text-white text-sm md:text-base">
-                  Time to take: <span className="text-[#e87a71] font-bold">{activeReminders[0].medName}</span> at {activeReminders[0].time}
+                  Time to take: <strong className="text-[#e87a71]">{activeReminders[0].medName}</strong> at {activeReminders[0].time}
                 </span>
               </div>
-              <p className="text-xs text-purple-200/70 mt-0.5 flex items-center gap-1.5">
+              <p className="text-xs text-red-200/70 mt-0.5 flex items-center gap-1.5">
                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10"/>
                   <polyline points="12 6 12 12 16 14"/>
                 </svg>
-                Reminder active for 1 minute: <span className="font-bold text-amber-400">{secondsRemaining}s</span> remaining before marked as missed!
+                Reminder active for 1 minute: <strong className="text-red-400">{secondsRemaining}s</strong> remaining before marked as missed!
               </p>
             </div>
           </div>
 
           <button
             onClick={() => handleMarkTaken(activeReminders[0])}
-            className="w-full sm:w-auto px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-gray-950 font-bold rounded-xl text-sm transition-all shadow-[0_0_20px_rgba(16,185,129,0.5)] flex items-center justify-center gap-1.5 cursor-pointer"
+            className="w-full sm:w-auto px-6 py-2.5 bg-[#c13024] hover:bg-[#a6251a] active:scale-95 text-white font-bold rounded-xl text-sm transition-all shadow-[0_0_15px_rgba(193,48,36,0.4)] flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"/>
@@ -668,9 +678,9 @@ function MedicationReminder() {
         {/* Left Column: Natural Language Agent Chat Interface (8 cols) */}
         <div className="lg:col-span-8 flex flex-col bg-[#130f11] border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl relative overflow-hidden">
           {/* Disclaimer Banner */}
-          <div className="bg-emerald-950/20 border border-emerald-900/40 rounded-xl px-4 py-2.5 mb-4 flex items-center justify-between text-xs text-emerald-300">
+          <div className="bg-red-950/20 border border-red-900/40 rounded-xl px-4 py-2.5 mb-4 flex items-center justify-between text-xs text-red-200/90">
             <div className="flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400 flex-shrink-0">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#e87a71] flex-shrink-0">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
               </svg>
               <span><strong>Reminder Only:</strong> This agent tracks schedules and does not provide medical advice or alter dosages.</span>
@@ -688,7 +698,7 @@ function MedicationReminder() {
                     <ReactMarkdown>{msg.text}</ReactMarkdown>
                   </div>
                 ) : msg.role === "user" ? (
-                  <div className="self-end bg-[#1a4a6e]/90 text-white border border-[#38bdf8]/30 px-5 py-3 rounded-2xl rounded-tr-sm max-w-[85%] text-sm shadow-md">
+                  <div className="self-end bg-[#c13024] text-white border border-red-500/30 px-5 py-3 rounded-2xl rounded-tr-sm max-w-[85%] text-sm shadow-md">
                     {msg.text}
                   </div>
                 ) : (
@@ -701,9 +711,9 @@ function MedicationReminder() {
 
             {isTyping && (
               <div className="self-start bg-[#0c0406] border border-white/10 px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-1.5 text-gray-400 text-xs">
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-bounce"></span>
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-bounce delay-150"></span>
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-bounce delay-300"></span>
+                <span className="w-2 h-2 rounded-full bg-[#c13024] animate-bounce"></span>
+                <span className="w-2 h-2 rounded-full bg-[#c13024] animate-bounce delay-150"></span>
+                <span className="w-2 h-2 rounded-full bg-[#c13024] animate-bounce delay-300"></span>
               </div>
             )}
             <div ref={chatEndRef} />
@@ -715,7 +725,7 @@ function MedicationReminder() {
               onClick={() => handleSendMessage(`Add Quick Dose for Now (${formatted24H})`)}
               className="px-3 py-1.5 bg-[#181114] hover:bg-[#25181e] border border-red-900/30 hover:border-red-500/50 text-gray-300 hover:text-white rounded-lg text-xs transition-all flex items-center gap-1.5 active:scale-95"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#c13024]"></span>
               Add Quick Dose for Now ({formatted24H})
             </button>
 
@@ -773,11 +783,10 @@ function MedicationReminder() {
         {/* Right Column: Dose Reminder Schedule Sidebar (4 cols) */}
         <div className="lg:col-span-4 flex flex-col gap-4">
           
-          {/* Header Card */}
           <div className="bg-[#130f11] border border-white/5 rounded-2xl p-5 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-950/60 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <div className="w-8 h-8 rounded-lg bg-red-950/60 border border-red-500/30 flex items-center justify-center text-[#e87a71]">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
                     <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
@@ -785,8 +794,8 @@ function MedicationReminder() {
                 </div>
                 <div>
                   <h3 className="font-bold text-sm text-white">Dose Reminder Schedule</h3>
-                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  <div className="flex items-center gap-1.5 text-[11px] text-[#e87a71]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#c13024] animate-pulse"></span>
                     Live Clock ({formatted24H})
                   </div>
                 </div>
@@ -803,13 +812,13 @@ function MedicationReminder() {
 
             {/* Section 1: ACTIVE REMINDERS */}
             <div className="space-y-2 mb-4">
-              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-purple-300">
+              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-[#e87a71]">
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                  <span className="w-2 h-2 rounded-full bg-[#c13024]"></span>
                   1. ACTIVE REMINDERS ({activeReminders.length})
                 </span>
                 {activeReminders.length > 0 && (
-                  <span className="px-2 py-0.5 bg-purple-500/30 border border-purple-400/30 text-purple-300 text-[9px] rounded font-bold">
+                  <span className="px-2 py-0.5 bg-red-950 text-[#e87a71] border border-red-500/40 text-[9px] rounded font-bold">
                     DUE RIGHT NOW
                   </span>
                 )}
@@ -823,16 +832,16 @@ function MedicationReminder() {
                 activeReminders.map((rem) => (
                   <div
                     key={rem.key}
-                    className="bg-[#1b0d1e] border border-purple-500/40 rounded-xl p-3.5 flex items-center justify-between shadow-[0_0_15px_rgba(168,85,247,0.2)]"
+                    className="bg-[#1a0c10] border border-red-500/40 rounded-xl p-3.5 flex items-center justify-between shadow-[0_0_15px_rgba(193,48,36,0.2)]"
                   >
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-white text-sm">{rem.medName}</span>
-                        <span className="px-2 py-0.5 bg-purple-900/60 border border-purple-400/40 text-purple-200 text-[10px] rounded font-mono">
+                        <span className="px-2 py-0.5 bg-red-950/80 border border-red-500/30 text-red-200 text-[10px] rounded font-mono">
                           {rem.time}
                         </span>
                       </div>
-                      <div className="text-[11px] text-purple-300/80 mt-1 flex items-center gap-1">
+                      <div className="text-[11px] text-red-300/80 mt-1 flex items-center gap-1">
                         <span>⏱️</span>
                         <span>1-min window: <strong>{secondsRemaining}s left</strong></span>
                       </div>
@@ -840,7 +849,7 @@ function MedicationReminder() {
 
                     <button
                       onClick={() => handleMarkTaken(rem)}
-                      className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold rounded-lg text-xs transition-colors shadow-sm flex items-center gap-1 cursor-pointer"
+                      className="px-3.5 py-1.5 bg-[#c13024] hover:bg-[#a6251a] text-white font-bold rounded-lg text-xs transition-colors shadow-sm flex items-center gap-1 cursor-pointer"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12"/>
@@ -854,31 +863,46 @@ function MedicationReminder() {
 
             {/* Section 2: NEXT DUE */}
             <div className="space-y-2 mb-4">
-              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-emerald-400">
+              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-[#e87a71]">
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  <span className="w-2 h-2 rounded-full bg-[#c13024]"></span>
                   2. NEXT DUE ({nextDueList.length})
                 </span>
+                {earliestNext && (
+                  <span className="text-[10px] font-mono text-[#e87a71]">
+                    Earliest: {earliestNext}
+                  </span>
+                )}
               </div>
 
               {nextDueList.length === 0 ? (
-                <div className="bg-[#0c0406] border border-emerald-950/40 rounded-xl p-3.5 text-xs text-gray-500 italic">
+                <div className="bg-[#0c0406] border border-white/5 rounded-xl p-3.5 text-xs text-gray-500 italic">
                   No upcoming doses scheduled for today.
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
                   {nextDueList.map((item, idx) => (
                     <div
-                      key={idx}
-                      className="bg-[#091815] border border-emerald-800/40 rounded-xl p-3 flex items-center justify-between"
+                      key={item.key || idx}
+                      className="bg-[#170c10] border border-red-900/30 rounded-xl p-3 flex items-center justify-between"
                     >
                       <div>
-                        <div className="font-semibold text-xs text-white">{item.name}</div>
-                        <div className="text-[10px] text-emerald-400 font-mono mt-0.5">{item.time} ({item.diffFormatted})</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-xs text-white">{item.name}</span>
+                          {idx === 0 && (
+                            <span className="px-1.5 py-0.2 bg-red-900/70 border border-red-500/40 text-[#e87a71] text-[9px] font-bold rounded">
+                              NEXT
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-[#e87a71] font-mono mt-0.5">{item.time} ({item.diffFormatted})</div>
                       </div>
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-500/30 text-emerald-300">
-                        Upcoming
-                      </span>
+                      <button
+                        onClick={() => handleMarkTaken({ medName: item.name, time: item.time, key: item.key })}
+                        className="px-2.5 py-1 rounded bg-[#c13024] hover:bg-[#a6251a] text-white text-[10px] font-bold transition-colors cursor-pointer"
+                      >
+                        Taken
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -887,10 +911,13 @@ function MedicationReminder() {
 
             {/* Section 3: MISSED */}
             <div className="space-y-2 mb-4">
-              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-rose-400">
+              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-red-400">
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-rose-400"></span>
+                  <span className="w-2 h-2 rounded-full bg-red-500"></span>
                   3. MISSED ({missedDoses.length})
+                </span>
+                <span className="px-2 py-0.5 bg-red-950 border border-red-500/40 text-red-300 font-bold text-[9px] rounded">
+                  Action Needed
                 </span>
               </div>
 
@@ -902,16 +929,24 @@ function MedicationReminder() {
                 <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
                   {missedDoses.map((m, idx) => (
                     <div
-                      key={idx}
-                      className="bg-[#200d0e] border border-rose-900/50 rounded-xl p-2.5 flex items-center justify-between"
+                      key={m.key || idx}
+                      className="bg-[#200a0d] border border-red-900/40 rounded-xl p-2.5 flex items-center justify-between"
                     >
                       <div>
-                        <div className="font-semibold text-xs text-rose-300">{m.medName}</div>
-                        <div className="text-[10px] text-rose-400/80">Scheduled {m.time} • Window Expired</div>
+                        <div className="font-semibold text-xs text-red-200">{m.medName}</div>
+                        <div className="text-[10px] text-red-300/80">{m.time} • Window Expired</div>
                       </div>
-                      <span className="text-[9px] px-1.5 py-0.5 bg-rose-950 text-rose-400 rounded font-bold">
-                        MISSED
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] px-1.5 py-0.5 bg-red-700 text-white rounded font-bold">
+                          MISSED
+                        </span>
+                        <button
+                          onClick={() => handleTakeLate(m)}
+                          className="px-2 py-0.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded text-[10px]"
+                        >
+                          Take Late
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -945,7 +980,7 @@ function MedicationReminder() {
                           {med.times.map((t, idx) => (
                             <span
                               key={idx}
-                              className="text-[9px] font-mono px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-gray-300"
+                              className="text-[9px] font-mono px-1.5 py-0.5 bg-red-950/60 border border-red-900/30 rounded text-red-200"
                             >
                               {t}
                             </span>
@@ -979,7 +1014,7 @@ function MedicationReminder() {
       {/* Manual Add Dose Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4">
-          <div className="bg-[#130f11] border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl animate-scaleUp">
+          <div className="bg-[#130f11] border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-lg text-white">Add Medication Schedule</h3>
               <button
