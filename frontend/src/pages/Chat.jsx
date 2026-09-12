@@ -120,8 +120,6 @@ function Chat() {
       setSecondsRemaining(currentRemaining);
 
       const todayDateStr = now.toDateString();
-
-      // Check due right now
       const dueRightNow = [];
 
       schedules.forEach((med) => {
@@ -148,7 +146,6 @@ function Chat() {
             });
           }
 
-          // Check if window expired today
           const [schH, schM] = timeStr.split(":").map(Number);
           const scheduledDate = new Date(now);
           scheduledDate.setHours(schH, schM, 59, 999);
@@ -186,6 +183,7 @@ function Chat() {
     return () => clearInterval(timer);
   }, [schedules, doseHistory, missedDoses]);
 
+  // Auth check & History fetch
   useEffect(() => {
     fetchHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -244,13 +242,250 @@ function Chat() {
     }
   };
 
+  // --- Advanced Time Parser ---
+  const parseTimesFromString = (str) => {
+    const times = [];
+    const clean = str.toLowerCase().replace(/at|and|,/g, " ");
+
+    // 1. Match 4-digit times with optional am/pm (e.g. 2341pm, 2341, 0930am, 0930)
+    const match4Digit = clean.match(/\b([012]\d)([0-5]\d)\s*(am|pm)?\b/gi);
+    if (match4Digit) {
+      match4Digit.forEach(t => {
+        const m = t.match(/(\d{2})(\d{2})\s*(am|pm)?/i);
+        if (m) {
+          let h = parseInt(m[1], 10);
+          const min = m[2];
+          const ampm = m[3] ? m[3].toLowerCase() : null;
+          if (ampm === "pm" && h < 12) h += 12;
+          if (ampm === "am" && h === 12) h = 0;
+          if (h >= 0 && h <= 23) {
+            times.push(`${String(h).padStart(2, "0")}:${min}`);
+          }
+        }
+      });
+    }
+
+    // 2. Match standard 12h/24h times with colons (e.g. 23:41, 11:41pm, 9:00 am, 9:30pm)
+    const matchColon = clean.match(/\b(\d{1,2}):(\d{2})\s*(am|pm)?\b/gi);
+    if (matchColon) {
+      matchColon.forEach(t => {
+        const m = t.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+        if (m) {
+          let h = parseInt(m[1], 10);
+          const min = m[2];
+          const ampm = m[3] ? m[3].toLowerCase() : null;
+          if (ampm === "pm" && h < 12) h += 12;
+          if (ampm === "am" && h === 12) h = 0;
+          if (h >= 0 && h <= 23) {
+            times.push(`${String(h).padStart(2, "0")}:${min}`);
+          }
+        }
+      });
+    }
+
+    // 3. Match simple hour with am/pm (e.g. 9pm, 8am, 11pm)
+    const matchSimple = clean.match(/\b(\d{1,2})\s*(am|pm)\b/gi);
+    if (matchSimple) {
+      matchSimple.forEach(t => {
+        const m = t.match(/(\d{1,2})\s*(am|pm)/i);
+        if (m) {
+          let h = parseInt(m[1], 10);
+          const ampm = m[2].toLowerCase();
+          if (ampm === "pm" && h < 12) h += 12;
+          if (ampm === "am" && h === 12) h = 0;
+          if (h >= 0 && h <= 23) {
+            times.push(`${String(h).padStart(2, "0")}:00`);
+          }
+        }
+      });
+    }
+
+    return Array.from(new Set(times));
+  };
+
+  // --- Process Reminder Command in Chat Stream ---
+  const processReminderCommand = (rawText) => {
+    const lower = rawText.toLowerCase().trim();
+
+    // 1. Clear memory
+    if (lower.includes("clear memory") || lower.includes("reset reminders") || lower.includes("clear all reminders")) {
+      setSchedules([]);
+      setDoseHistory([]);
+      setMissedDoses([]);
+      setActiveReminders([]);
+      localStorage.removeItem("medassist_schedules");
+      localStorage.removeItem("medassist_dose_history");
+      localStorage.removeItem("medassist_missed_doses");
+      return "🧹 All medication memory and schedules have been cleared from your account.";
+    }
+
+    // 2. Add quick dose for now
+    if (lower.includes("quick dose") || lower.includes("dose for now") || lower.includes("right now")) {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, "0");
+      const m = String(now.getMinutes()).padStart(2, "0");
+      const timeStr = `${h}:${m}`;
+      
+      let name = "Paracetamol";
+      const nameMatch = lower.match(/add (?:quick dose for |medicine |dose for )?([a-zA-Z0-9\s]+?)(?: at| right now| now|$)/i);
+      if (nameMatch && nameMatch[1] && !nameMatch[1].includes("now") && !nameMatch[1].includes("dose")) {
+        name = nameMatch[1].trim();
+      }
+
+      const formattedName = name.charAt(0).toUpperCase() + name.slice(1);
+      const newMed = {
+        id: Date.now().toString(),
+        name: formattedName,
+        times: [timeStr],
+        active: true
+      };
+
+      setSchedules(prev => [...prev, newMed]);
+      return `Added **${formattedName}** for **${timeStr}** (Due right now!). The active reminder banner is now active for 1 minute at the top.`;
+    }
+
+    // 3. Next dose query
+    if (lower.includes("next dose") || lower.includes("what is next") || lower.includes("upcoming dose")) {
+      const now = new Date();
+      const currentMinutesToday = now.getHours() * 60 + now.getMinutes();
+
+      let nextDoseInfo = null;
+      let minDiff = Infinity;
+
+      schedules.forEach((med) => {
+        med.times.forEach((t) => {
+          const [h, m] = t.split(":").map(Number);
+          const doseMinutes = h * 60 + m;
+          let diff = doseMinutes - currentMinutesToday;
+          if (diff <= 0) diff += 24 * 60;
+          if (diff < minDiff) {
+            minDiff = diff;
+            nextDoseInfo = {
+              name: med.name,
+              time: t,
+              diffHours: Math.floor(diff / 60),
+              diffMins: diff % 60,
+              isTomorrow: doseMinutes <= currentMinutesToday
+            };
+          }
+        });
+      });
+
+      if (!nextDoseInfo) {
+        return "You currently have no scheduled doses. You can schedule one anytime by typing e.g., *\"Add Paracetamol at 21:00\"* or *\"Add Amoxicillin at 08:00 and 20:00\"*.";
+      }
+
+      const timeRemainingStr = nextDoseInfo.diffHours > 0 
+        ? `${nextDoseInfo.diffHours}h ${nextDoseInfo.diffMins}m`
+        : `${nextDoseInfo.diffMins} minute${nextDoseInfo.diffMins === 1 ? '' : 's'}`;
+
+      return `Your next scheduled dose is **${nextDoseInfo.name}** at **${nextDoseInfo.time}** (${nextDoseInfo.isTomorrow ? 'Tomorrow' : 'Today'}, in **${timeRemainingStr}**).`;
+    }
+
+    // 4. Check schedule
+    if (lower.includes("check my schedule") || lower.includes("check schedule") || lower.includes("my schedule") || lower.includes("list medications")) {
+      if (schedules.length === 0) {
+        return "Your medication schedule is currently empty. Add a dose by typing e.g., *\"Add Paracetamol at 21:00\"*.";
+      }
+      let text = "### 📋 Your Active Medication Schedule:\n\n";
+      schedules.forEach(m => {
+        text += `- **${m.name}**: ${m.times.join(", ")}\n`;
+      });
+      text += `\n*Tracked live in the Dose Reminder Schedule panel.*`;
+      return text;
+    }
+
+    // 5. Add medication (e.g. "add paracetamol at 2341pm", "add paracetamol at 9pm", "remind me to take aspirin at 08:00 and 20:00")
+    if (lower.startsWith("add") || lower.includes("remind me to take") || lower.includes("schedule ") || lower.includes("reminder for")) {
+      const addMatch = lower.match(/(?:add|remind me to take|schedule|set reminder for)\s+(?:medicine\s+|drug\s+)?([a-zA-Z0-9\s]+?)\s+(?:at|every)\s+([0-9ap\s,.:and]+)/i);
+
+      if (addMatch) {
+        const rawMedName = addMatch[1].trim();
+        const rawTimeString = addMatch[2].trim();
+        const formattedName = rawMedName.charAt(0).toUpperCase() + rawMedName.slice(1);
+        const times = parseTimesFromString(rawTimeString);
+
+        if (times.length > 0) {
+          setSchedules(prev => {
+            const existingIndex = prev.findIndex(m => m.name.toLowerCase() === formattedName.toLowerCase());
+            if (existingIndex >= 0) {
+              const updated = [...prev];
+              const mergedTimes = Array.from(new Set([...updated[existingIndex].times, ...times])).sort();
+              updated[existingIndex] = { ...updated[existingIndex], times: mergedTimes };
+              return updated;
+            } else {
+              return [
+                ...prev,
+                {
+                  id: Date.now().toString(),
+                  name: formattedName,
+                  times: times.sort(),
+                  active: true
+                }
+              ];
+            }
+          });
+
+          const timesFormatted = times.map(t => `**${t}**`).join(" and ");
+          return `Added **${formattedName}** with scheduled times at ${timesFormatted}. Your live Dose Reminder Schedule on the right has been updated and will alert you right on time!`;
+        }
+      }
+    }
+
+    // 6. Delete / cancel medication
+    if (lower.startsWith("delete") || lower.startsWith("remove") || lower.startsWith("cancel")) {
+      const deleteMatch = lower.match(/(?:delete|remove|cancel)\s+(?:medicine\s+|drug\s+)?([a-zA-Z0-9\s]+)/i);
+      if (deleteMatch) {
+        const targetName = deleteMatch[1].trim().toLowerCase();
+        const exists = schedules.some(m => m.name.toLowerCase() === targetName);
+        if (exists) {
+          setSchedules(prev => prev.filter(m => m.name.toLowerCase() !== targetName));
+          return `Removed **${targetName}** from your medication reminder schedule.`;
+        }
+      }
+    }
+
+    return null; // Not a reminder command, forward to medical LLM
+  };
+
   const sendMessage = async (textToSend) => {
-    const text = textToSend || message;
+    const text = (textToSend || message).trim();
     if (!text) return;
 
-    setMessages([...messages, { role: "user", text }]);
+    setMessages(prev => [...prev, { role: "user", text }]);
     setMessage("");
 
+    // Check if this is a medication reminder instruction
+    const reminderResponse = processReminderCommand(text);
+
+    if (reminderResponse) {
+      // Add agent response immediately
+      setMessages(prev => [...prev, { role: "ai", text: reminderResponse }]);
+
+      // Also persist consultation in MongoDB via API
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/v1/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ symptoms: text, chatId: activeChatId })
+        });
+        if (res.status === 401) {
+          navigate("/login");
+          return;
+        }
+        const data = await res.json();
+        if (!activeChatId && data.chatId) {
+          setActiveChatId(data.chatId);
+          fetchHistory();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+      return;
+    }
+
+    // Standard medical AI consultation
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/chat`, {
         method: "POST",
@@ -283,7 +518,7 @@ function Chat() {
     const file = e.target.files[0];
     if (!file) return;
 
-    setMessages([...messages, { role: "user", text: `Uploaded file: ${file.name}` }]);
+    setMessages(prev => [...prev, { role: "user", text: `Uploaded file: ${file.name}` }]);
     setIsUploading(true);
 
     const formData = new FormData();
@@ -390,7 +625,6 @@ function Chat() {
     setShowAddModal(false);
   };
 
-  // Helper: Next Due list for right widget
   const getNextDueDoses = () => {
     const now = currentTime;
     const currentMins = now.getHours() * 60 + now.getMinutes();
@@ -422,17 +656,15 @@ function Chat() {
 
   const nextDueList = getNextDueDoses();
   const earliestNext = nextDueList.length > 0 ? nextDueList[0].time : null;
-
   const current24HStr = `${String(currentTime.getHours()).padStart(2, "0")}:${String(currentTime.getMinutes()).padStart(2, "0")}`;
 
   return (
     <div className="h-screen bg-[#090507] text-white flex flex-col font-sans overflow-hidden selection:bg-red-500/30">
       
-      {/* 1. TOP ACTIVE REMINDER BANNER (DUE NOW) - MedAssist Crimson & Deep Wine Styling */}
+      {/* 1. TOP ACTIVE REMINDER BANNER (DUE NOW) */}
       {activeReminders.length > 0 && (
         <div className="bg-gradient-to-r from-[#1c080d] via-[#14080b] to-[#0c0406] border-b border-[#c13024]/60 px-6 py-3 flex items-center justify-between shadow-[0_4px_25px_rgba(193,48,36,0.3)] z-30 transition-all">
           <div className="flex items-center gap-3">
-            {/* Bell Icon */}
             <div className="w-10 h-10 rounded-xl bg-red-950/80 border border-red-500/40 flex items-center justify-center text-[#e87a71] shadow-[0_0_15px_rgba(193,48,36,0.3)] animate-pulse">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
@@ -471,7 +703,7 @@ function Chat() {
         </div>
       )}
 
-      {/* Main Body with Left History Sidebar, Center Chat, and Right Dose Reminder Schedule */}
+      {/* Main Body */}
       <div className="flex-1 flex overflow-hidden">
         
         {/* Mobile Left Sidebar Drawer */}
@@ -612,14 +844,14 @@ function Chat() {
                   <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>
                 </div>
                 <h1 className="text-2xl md:text-3xl font-bold mb-2">How can I help <span className="text-[#e87a71]">today?</span></h1>
-                <p className="text-gray-400 text-xs md:text-sm mb-8 text-center">Ask about symptoms, medications, or general medical topics.</p>
+                <p className="text-gray-400 text-xs md:text-sm mb-8 text-center">Ask about symptoms, medications, or track your live medication schedule.</p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
                   {[
-                    "I've had a sore throat and mild fever for 3 days — what could it be?",
-                    "Explain the difference between ibuprofen and acetaminophen.",
-                    "What should I do for a suspected sprained ankle?",
-                    "Help me understand a basic lipid panel result."
+                    "Add Paracetamol at 21:00",
+                    "What is my next scheduled dose?",
+                    "Check my medication schedule",
+                    "Explain the difference between ibuprofen and acetaminophen."
                   ].map((suggestion, i) => (
                     <button
                       key={i}
@@ -670,7 +902,7 @@ function Chat() {
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !isUploading && sendMessage()}
                 disabled={isUploading}
-                placeholder={isUploading ? "Analyzing report..." : "Describe symptoms, ask about a medication, or paste a lab result..."}
+                placeholder={isUploading ? "Analyzing report..." : "E.g., 'Add Paracetamol at 21:00' or describe symptoms..."}
                 className="w-full bg-[#130f11] border border-white/10 p-3.5 pl-14 pr-14 rounded-2xl outline-none focus:border-white/30 text-white placeholder-gray-500 transition-colors text-sm disabled:opacity-50"
               />
               <button
@@ -687,7 +919,7 @@ function Chat() {
           </div>
         </div>
 
-        {/* 2. RIGHT SIDEBAR: DOSE REMINDER SCHEDULE PANEL - MedAssist Crimson & Coral Styling */}
+        {/* 2. RIGHT SIDEBAR: DOSE REMINDER SCHEDULE PANEL */}
         {isReminderSidebarOpen && (
           <div className="w-[340px] xl:w-[380px] bg-[#0c0406] border-l border-red-900/20 flex flex-col h-full flex-shrink-0 p-4 overflow-y-auto shadow-2xl">
             
@@ -766,7 +998,7 @@ function Chat() {
               )}
             </div>
 
-            {/* Section 2: NEXT DUE (MedAssist Dark Card) */}
+            {/* Section 2: NEXT DUE */}
             <div className="bg-[#120a0d] border border-red-900/30 rounded-2xl p-3.5 mb-4 shadow-[0_0_20px_rgba(193,48,36,0.08)]">
               <div className="flex items-center justify-between mb-3 text-xs font-semibold text-[#e87a71]">
                 <span className="flex items-center gap-1.5">
@@ -826,7 +1058,7 @@ function Chat() {
               )}
             </div>
 
-            {/* Section 3: MISSED (Dark Maroon Card) */}
+            {/* Section 3: MISSED */}
             <div className="bg-[#18090b] border border-red-900/40 rounded-2xl p-3.5 mb-2 shadow-[0_0_20px_rgba(239,68,68,0.1)]">
               <div className="flex items-center justify-between mb-1.5 text-xs font-semibold text-red-400">
                 <span className="flex items-center gap-1.5">

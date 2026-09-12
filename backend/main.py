@@ -205,7 +205,7 @@ async def chat(data: ChatRequest):
     try:
         # messages is list of dicts {"role": "...", "text": "..."}
         # LangChain expects structured messages
-        langchain_msgs = [SystemMessage(content="You are a highly empathetic and knowledgeable AI medical assistant. CRITICAL RULES: 1. ONLY answer questions related to medicine, health, or wellness. 2. If the user asks about ANYTHING else (e.g. coding, math, politics), politely refuse and state you are strictly a medical assistant. 3. Do not provide final diagnoses. Keep responses structured and easy to read using Markdown.")]
+        langchain_msgs = [SystemMessage(content="You are a highly empathetic and knowledgeable AI medical assistant. CRITICAL RULES: 1. ONLY answer questions related to medicine, health, symptoms, wellness, and medication reminders. 2. MedAssist has an integrated Dose Reminder Agent on screen; acknowledge when users track/schedule medication reminders and provide safe guidance. 3. If the user asks about ANYTHING else (e.g. coding, math, politics), politely refuse and state you are strictly a medical assistant. 4. Do not provide final diagnoses. Keep responses structured and easy to read using Markdown.")]
         
         for msg in data.messages:
             if msg.get("role") == "user":

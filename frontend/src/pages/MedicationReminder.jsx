@@ -1,8 +1,28 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
+import { API_BASE_URL } from "../config";
 
 function MedicationReminder() {
+  const navigate = useNavigate();
+
+  // Auth guard: strictly allow access only after login
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/v1/user/profile`, {
+          credentials: "include"
+        });
+        if (res.status === 401 || !res.ok) {
+          navigate("/login");
+        }
+      } catch (err) {
+        navigate("/login");
+      }
+    };
+    checkAuth();
+  }, [navigate]);
+
   const [currentTime, setCurrentTime] = useState(new Date());
   const [schedules, setSchedules] = useState(() => {
     const saved = localStorage.getItem("medassist_schedules");
@@ -460,33 +480,60 @@ function MedicationReminder() {
 
   const parseTimesFromString = (str) => {
     const times = [];
-    const tokens = str.split(/(?:and|,|\s+)/).map(s => s.trim()).filter(Boolean);
+    const clean = str.toLowerCase().replace(/at|and|,/g, " ");
 
-    tokens.forEach((token) => {
-      const match12 = token.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
-      if (match12) {
-        let hour = parseInt(match12[1], 10);
-        const min = match12[2] ? match12[2].padStart(2, "0") : "00";
-        const isPm = match12[3].toLowerCase() === "pm";
-        if (isPm && hour < 12) hour += 12;
-        if (!isPm && hour === 12) hour = 0;
-        times.push(`${String(hour).padStart(2, "0")}:${min}`);
-        return;
-      }
-
-      const match24 = token.match(/^([01]?[0-9]|2[0-3]):([0-5][0-9])$/);
-      if (match24) {
-        times.push(`${match24[1].padStart(2, "0")}:${match24[2]}`);
-        return;
-      }
-
-      if (/^\d{1,2}$/.test(token)) {
-        const h = parseInt(token, 10);
-        if (h >= 0 && h <= 23) {
-          times.push(`${String(h).padStart(2, "0")}:00`);
+    // 1. Match 4-digit times with optional am/pm (e.g. 2341pm, 2341, 0930am, 0930)
+    const match4Digit = clean.match(/\b([012]\d)([0-5]\d)\s*(am|pm)?\b/gi);
+    if (match4Digit) {
+      match4Digit.forEach(t => {
+        const m = t.match(/(\d{2})(\d{2})\s*(am|pm)?/i);
+        if (m) {
+          let h = parseInt(m[1], 10);
+          const min = m[2];
+          const ampm = m[3] ? m[3].toLowerCase() : null;
+          if (ampm === "pm" && h < 12) h += 12;
+          if (ampm === "am" && h === 12) h = 0;
+          if (h >= 0 && h <= 23) {
+            times.push(`${String(h).padStart(2, "0")}:${min}`);
+          }
         }
-      }
-    });
+      });
+    }
+
+    // 2. Match standard 12h/24h times with colons (e.g. 23:41, 11:41pm, 9:00 am, 9:30pm)
+    const matchColon = clean.match(/\b(\d{1,2}):(\d{2})\s*(am|pm)?\b/gi);
+    if (matchColon) {
+      matchColon.forEach(t => {
+        const m = t.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+        if (m) {
+          let h = parseInt(m[1], 10);
+          const min = m[2];
+          const ampm = m[3] ? m[3].toLowerCase() : null;
+          if (ampm === "pm" && h < 12) h += 12;
+          if (ampm === "am" && h === 12) h = 0;
+          if (h >= 0 && h <= 23) {
+            times.push(`${String(h).padStart(2, "0")}:${min}`);
+          }
+        }
+      });
+    }
+
+    // 3. Match simple hour with am/pm (e.g. 9pm, 8am, 11pm)
+    const matchSimple = clean.match(/\b(\d{1,2})\s*(am|pm)\b/gi);
+    if (matchSimple) {
+      matchSimple.forEach(t => {
+        const m = t.match(/(\d{1,2})\s*(am|pm)/i);
+        if (m) {
+          let h = parseInt(m[1], 10);
+          const ampm = m[2].toLowerCase();
+          if (ampm === "pm" && h < 12) h += 12;
+          if (ampm === "am" && h === 12) h = 0;
+          if (h >= 0 && h <= 23) {
+            times.push(`${String(h).padStart(2, "0")}:00`);
+          }
+        }
+      });
+    }
 
     return Array.from(new Set(times));
   };
