@@ -1,0 +1,17 @@
+{
+  "name": "medassist-e2e-tests",
+  "version": "1.0.0",
+  "description": "Playwright API and integration tests for MedAssist",
+  "scripts": {
+    "test": "playwright test",
+    "test:ci": "CI=true playwright test",
+    "test:report": "playwright show-report playwright-report"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.3"
+  }
+}
