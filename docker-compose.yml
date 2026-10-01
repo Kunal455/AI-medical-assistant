@@ -37,7 +37,7 @@ services:
       context: ./backend
     container_name: medassist_python_backend
     ports:
-      - "8000:8000"
+      - "8001:8000"
     env_file:
       - ./backend/.env
     volumes:

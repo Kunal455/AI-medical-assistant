@@ -5,9 +5,9 @@ pipeline {
         // Internal URLs used by Playwright to reach the running containers.
         // These match the ports exposed in docker-compose.yml:
         //   node-backend  → 5000:5000
-        //   python-backend → 8000:8000
+        //   python-backend → 8001:8000
         NODE_API_URL   = 'http://localhost:5000'
-        PYTHON_API_URL = 'http://localhost:8000'
+        PYTHON_API_URL = 'http://localhost:8001'
         CI             = 'true'
     }
 
@@ -104,9 +104,9 @@ pipeline {
                         sleep 2
                     done
 
-                    echo "Waiting for Python FastAPI on port 8000..."
+                    echo "Waiting for Python FastAPI on port 8001..."
                     for i in $(seq 1 30); do
-                        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/ || true)
+                        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/ || true)
                         if [ "$STATUS" = "200" ]; then
                             echo "Python FastAPI is ready (HTTP 200)"
                             break
