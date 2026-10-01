@@ -47,21 +47,40 @@ pipeline {
             }
         }
 
-        // ── Stage 5: Build Docker images ─────────────────────────────────
+        // ── Stage 5: Create CI .env ──────────────────────────────────────
+        stage('Create CI .env') {
+            environment {
+                MONGO_URI = credentials('MONGO_URI')
+                JWT_SECRET = credentials('JWT_SECRET')
+                GEMINI_API_KEY = credentials('GEMINI_API_KEY')
+            }
+            steps {
+                sh '''
+                    echo "MONGO_URI=${MONGO_URI}" > node-backend/.env
+                    echo "JWT_SECRET=${JWT_SECRET}" >> node-backend/.env
+                    echo "GEMINI_API_KEY=${GEMINI_API_KEY}" >> node-backend/.env
+
+                    echo "MONGO_URI=${MONGO_URI}" > backend/.env
+                    echo "JWT_SECRET=${JWT_SECRET}" >> backend/.env
+                    echo "GEMINI_API_KEY=${GEMINI_API_KEY}" >> backend/.env
+                '''
+            }
+        }
+
+        // ── Stage 6: Build Docker images ─────────────────────────────────
         stage('Build Docker Images') {
             steps {
                 sh 'docker compose build --no-cache'
             }
         }
 
-        // ── Stage 6: Start services ──────────────────────────────────────
+        // ── Stage 7: Start services ──────────────────────────────────────
         // Start node-backend and python-backend in detached mode.
         // We intentionally skip the frontend container — Playwright only
         // talks to the two APIs (ports 5000 and 8000).
         stage('Start Services') {
             steps {
-                sh 'touch node-backend/.env backend/.env'
-                sh 'docker compose down -v --remove-orphans || true'
+                sh 'docker compose down --remove-orphans || true'
                 sh 'docker compose up -d node-backend python-backend'
             }
         }
