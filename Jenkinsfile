@@ -60,6 +60,7 @@ pipeline {
         // talks to the two APIs (ports 5000 and 8000).
         stage('Start Services') {
             steps {
+                sh 'touch node-backend/.env backend/.env'
                 sh 'docker compose up -d node-backend python-backend'
             }
         }
