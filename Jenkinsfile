@@ -102,7 +102,7 @@ pipeline {
                 dir('e2e-tests') {
                     sh 'npm install'
                     // Install Chromium browser only (lightest option, sufficient for API tests)
-                    sh 'npx playwright install chromium --with-deps'
+                    sh 'npx playwright install chromium'
                 }
             }
         }
