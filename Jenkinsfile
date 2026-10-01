@@ -81,7 +81,7 @@ pipeline {
         stage('Start Services') {
             steps {
                 sh 'docker compose down --remove-orphans || true'
-                sh 'docker rm -f medassist_node_backend medassist_python_backend medassist_frontend || true'
+                sh 'docker rm -f medassist_node_backend medassist_python_backend medassist_frontend 2>/dev/null || true'
                 sh 'docker compose up -d node-backend python-backend'
             }
         }
