@@ -61,6 +61,7 @@ pipeline {
         stage('Start Services') {
             steps {
                 sh 'touch node-backend/.env backend/.env'
+                sh 'docker compose down -v --remove-orphans || true'
                 sh 'docker compose up -d node-backend python-backend'
             }
         }
